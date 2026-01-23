@@ -1,7 +1,11 @@
-﻿namespace Domain.DTOs
+﻿using System;
+
+namespace Domain.DTOs
 {
+    [Serializable]
     public class AuthRequestDTO
     {
-        // TO DO: Define properties for authentication request here
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 }

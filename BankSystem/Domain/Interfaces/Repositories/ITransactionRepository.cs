@@ -1,7 +1,13 @@
-﻿namespace Domain.Interfaces.Repositories
+﻿using Domain.Models;
+using System;
+using System.Collections.Generic;
+
+namespace Domain.Interfaces.Repositories
 {
     public interface ITransactionRepository
     {
-        // TO DO: Define transaction repository methods here
+        bool CreateTransaction(Transaction newTransaction);
+        Transaction GetTransactionById(Guid transactionId);
+        IEnumerable<Transaction> GetAllTransactions();
     }
 }
