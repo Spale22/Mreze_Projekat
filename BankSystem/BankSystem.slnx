@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="BranchOffice/BranchOffice.csproj" Id="ca175a08-1219-476d-a984-bd2765d3b67e" />
+  <Project Path="Client/Client.csproj" Id="492949f3-4903-4314-947b-3af1c2130797" />
+  <Project Path="Domain/Domain.csproj" Id="8aeafcbd-2776-4a72-a95f-f617b19e4836" />
+  <Project Path="Infrastructure/Infrastructure.csproj" Id="e4868b92-07f0-420a-8a82-f19901a04138" />
+  <Project Path="Server/Server.csproj" Id="035882c8-0fc2-45b5-a993-00fa56ace281" />
+</Solution>
