@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 
-namespace Domain.Serialization
+namespace Domain.HelperMethods
 {
     public static class SerializationHelper
     {

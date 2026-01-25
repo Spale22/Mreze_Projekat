@@ -1,7 +1,9 @@
-﻿namespace Domain.Interfaces.Services
+﻿using Domain.DTOs;
+
+namespace Domain.Interfaces.Services
 {
     public interface IAuthenticationService
     {
-        // TO DO: Define authentication service methods here
+        AuthResponseDTO Authenticate(AuthRequestDTO request);
     }
 }
