@@ -52,11 +52,5 @@
   <ItemGroup>
     <Folder Include="Services\" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Domain\Domain.csproj">
-      <Project>{8aeafcbd-2776-4a72-a95f-f617b19e4836}</Project>
-      <Name>Domain</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
