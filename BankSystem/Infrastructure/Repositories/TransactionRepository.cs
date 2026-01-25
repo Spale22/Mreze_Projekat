@@ -1,11 +1,9 @@
-﻿using Domain.Enumerations;
-using Domain.Interfaces.Repositories;
-using Domain.Models;
+﻿using Domain;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-namespace Infrastructure.Repositories
+namespace Infrastructure
 {
     public class TransactionRepository : ITransactionRepository
     {

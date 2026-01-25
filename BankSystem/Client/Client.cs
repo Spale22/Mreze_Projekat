@@ -1,6 +1,4 @@
 ﻿using System;
-using Domain.DTOs;
-using Domain.HelperMethods;
 using System.Net;
 using System.Net.Sockets;
 
@@ -9,6 +7,11 @@ namespace Client
     public class Client
     {
         static void Main(string[] args)
+        {
+            Run();
+        }
+
+        static void Run()
         {
             Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             clientSocket.ReceiveTimeout = 2000;

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 
-namespace Domain.Security
+namespace Domain
 {
     public static class Encryptor
     {

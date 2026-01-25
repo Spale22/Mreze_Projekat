@@ -41,19 +41,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DTOs\AuthRequestDTO.cs" />
-    <Compile Include="DTOs\AuthResponseDTO.cs" />
-    <Compile Include="DTOs\ClientDataRequestDTO.cs" />
-    <Compile Include="DTOs\ClientDataResponseDTO.cs" />
-    <Compile Include="DTOs\TransactionRequestDTO.cs" />
-    <Compile Include="DTOs\TransactionResponseDTO.cs" />
     <Compile Include="Enumerations\PackageType.cs" />
     <Compile Include="Enumerations\TransactionType.cs" />
     <Compile Include="Interfaces\Repositories\ITransactionRepository.cs" />
     <Compile Include="Interfaces\Repositories\IClientRepository.cs" />
-    <Compile Include="Interfaces\Services\IAuthenticationService.cs" />
-    <Compile Include="Interfaces\Services\IClientDataService.cs" />
-    <Compile Include="Interfaces\Services\ITransactionService.cs" />
     <Compile Include="Models\Transaction.cs" />
     <Compile Include="Models\Client.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

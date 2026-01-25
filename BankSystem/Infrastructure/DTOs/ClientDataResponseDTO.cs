@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Domain.DTOs
+namespace Infrastructure
 {
     [Serializable]
     public class ClientDataResponseDTO

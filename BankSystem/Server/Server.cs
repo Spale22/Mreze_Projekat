@@ -1,8 +1,5 @@
-﻿using Domain.DTOs;
-using Domain.Enumerations;
-using Domain.HelperMethods;
-using Domain.Interfaces.Services;
-using Server.Services;
+﻿using Domain;
+using Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -13,11 +10,16 @@ namespace Server
 {
     public class Server
     {
-        static readonly ITransactionService transactionService = new TransactionService();
-        static readonly IAuthenticationService authenticationService = new AuthenticationService();
-        static readonly IClientDataService clientDataService = new ClientDataService();
+        static readonly TransactionService transactionService = new TransactionService();
+        static readonly AuthenticationService authenticationService = new AuthenticationService();
+        static readonly ClientDataService clientDataService = new ClientDataService();
         const int maxClients = 10;
         static void Main(string[] args)
+        {
+            Run();
+        }
+
+        static void Run()
         {
             Socket listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             IPEndPoint listenEndPoint = new IPEndPoint(IPAddress.Loopback, 15000);
@@ -81,7 +83,7 @@ namespace Server
                     foreach (Socket s in checkRead)
                     {
                         if (s == listener)
-                        { 
+                        {
                             if (readSockets.Count >= maxClients)
                                 continue;
                             Socket clientSocket = listener.Accept();

@@ -1,10 +1,9 @@
-﻿using Domain.Interfaces.Repositories;
-using Domain.Models;
+﻿using Domain;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-namespace Infrastructure.Repositories
+namespace Infrastructure
 {
     public class ClientRepository : IClientRepository
     {
@@ -28,14 +27,8 @@ namespace Infrastructure.Repositories
         {
             if (clients.TryGetValue(clientId, out var client))
             {
-                Client updatedClient = new Client
-                {
-                    ClientId = client.ClientId,
-                    FirstName = client.FirstName,
-                    LastName = client.LastName,
-                    Balance = newBalance
-                };
-                return clients.TryUpdate(clientId, updatedClient, client);
+                client.Balance = newBalance;
+                return true;
             }
             else
             {

@@ -8,6 +8,11 @@ namespace BranchOffice
     {
         static void Main(string[] args)
         {
+            Run();
+        }
+
+        static void Run()
+        {
             Socket branchSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             IPEndPoint localEP = new IPEndPoint(IPAddress.Loopback, 16001);
             branchSocket.Bind(localEP);

@@ -1,11 +1,11 @@
 ﻿using System;
 
-namespace Domain.Models
+namespace Domain
 {
     [Serializable]
     public class Client
     {
-        public Guid ClientId { get; set; } = Guid.Empty;
+        public Guid ClientId { get; private set; } = Guid.Empty;
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public double Balance { get; set; } = 0.0;

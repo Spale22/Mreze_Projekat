@@ -1,12 +1,11 @@
-﻿using Domain.Enumerations;
-using System.IO;
+﻿using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 
-namespace Domain.HelperMethods
+namespace Domain
 {
     public static class SerializationHelper
     {
-        public static byte[] Serialize<T>(PackageType pkgType , T obj)
+        public static byte[] Serialize<T>(PackageType pkgType, T obj)
         {
             byte[] dataBuffer;
             using (MemoryStream ms = new MemoryStream())

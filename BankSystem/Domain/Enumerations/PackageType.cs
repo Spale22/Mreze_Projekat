@@ -1,10 +1,10 @@
-﻿namespace Domain.Enumerations
+﻿namespace Domain
 {
     public enum PackageType
     {
         Unknown = 0,
-        AuthRequest ,
-        TransactionRequest ,
+        AuthRequest,
+        TransactionRequest,
         ClientDataRequest,
         AuthResponse,
         TransactionResponse,
