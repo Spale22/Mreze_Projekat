@@ -47,6 +47,7 @@
     <Compile Include="DTOs\ClientDataResponseDTO.cs" />
     <Compile Include="DTOs\TransactionRequestDTO.cs" />
     <Compile Include="DTOs\TransactionResponseDTO.cs" />
+    <Compile Include="Enumerations\PackageType.cs" />
     <Compile Include="Enumerations\TransactionType.cs" />
     <Compile Include="Interfaces\Repositories\ITransactionRepository.cs" />
     <Compile Include="Interfaces\Repositories\IClientRepository.cs" />
