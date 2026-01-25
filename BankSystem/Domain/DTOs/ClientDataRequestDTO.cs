@@ -5,6 +5,7 @@ namespace Domain.DTOs
     [Serializable]
     public class ClientDataRequestDTO
     {
-        // TO DO: Define response properties here
+        public string Operation {  get; set; }
+        public double Amount { get; set; }
     }
 }
