@@ -13,42 +13,68 @@ namespace Client
             Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             clientSocket.ReceiveTimeout = 2000;
 
-            IPEndPoint branchEP = new IPEndPoint(IPAddress.Loopback, 15001);
+            IPEndPoint branchEP = new IPEndPoint(IPAddress.Loopback, 16001);
 
-            Console.Write("Operation: ");
-            string operation = Console.ReadLine() ?? "";
 
-            Console.Write("Amount: ");
-            double amount = 0.0;
-            double.TryParse(Console.ReadLine(), out amount);
+            var cts = new System.Threading.CancellationTokenSource();
 
-            ClientDataRequestDTO request = new ClientDataRequestDTO
+            Console.CancelKeyPress += (sender, e) =>
             {
-                Operation = operation, 
-                Amount = amount
+                e.Cancel = true;
+                cts.Cancel();
+                Console.WriteLine("Shutdown requested (Ctrl+C).");
             };
 
-            byte[] sendBuffer = SerializationHelper.Serialize(request);
-            clientSocket.SendTo(sendBuffer, branchEP);
-
-            byte[] recvBuffer = new byte[8192];
-            EndPoint senderEP = new IPEndPoint(IPAddress.Any, 0);
-
-            try
+            while (!cts.IsCancellationRequested)
             {
-                int bytesReceived = clientSocket.ReceiveFrom(recvBuffer, ref senderEP);
-                byte[] message = new byte[bytesReceived];
-                Array.Copy(recvBuffer, message, bytesReceived);
+                int opr = -1;
+                do
+                {
+                    Console.WriteLine("Operation: ");
+                    Console.WriteLine(" 1 - Balance inquiry");
+                    Console.WriteLine(" 2 - Deposit");
+                    Console.WriteLine(" 3 - Withdraw");
+                    Console.WriteLine(" 4 - Transfer money");
+                    Int32.TryParse(Console.ReadLine(), out opr);
+                } while (opr < 0 || opr > 3);
 
-                ClientDataResponseDTO response = SerializationHelper.Deserialize<ClientDataResponseDTO>(message);
-                Console.WriteLine($"Response from server: Success={response.Success}, Message='{response.Message}'");
+                switch (opr)
+                {
+                    case 1:
+                        HandleBalanceInqiry(clientSocket, branchEP);
+                        break;
+                    case 2:
+                        HandleDeposit(clientSocket, branchEP);
+                        break;
+                    case 3:
+                        HandleWithdraw(clientSocket, branchEP);
+                        break;
+                    case 4:
+                        HandleTransfer(clientSocket, branchEP);
+                        break;
+                }
             }
-            catch (SocketException ex)
-            {
-                Console.WriteLine($"Socket error: {ex.Message}");
-            }
-            
+
             clientSocket.Close();
+            Console.WriteLine("Client shuting down ...");
+            Console.ReadKey();
+        }
+
+        private static void HandleBalanceInqiry(Socket clientSocket, IPEndPoint branchEP)
+        {
+
+        }
+        private static void HandleDeposit(Socket clientSocket, IPEndPoint branchEP)
+        {
+
+        }
+        private static void HandleWithdraw(Socket clientSocket, IPEndPoint branchEP)
+        {
+
+        }
+        private static void HandleTransfer(Socket clientSocket, IPEndPoint branchEP)
+        {
+
         }
     }
 }
