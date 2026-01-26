@@ -8,12 +8,8 @@ namespace BranchOffice
 {
     public class BranchOffice
     {
+        private static string enc_key = "";
         static void Main(string[] args)
-        {
-            Run();
-        }
-
-        static void Run()
         {
             Socket branchSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             IPEndPoint localEP = new IPEndPoint(IPAddress.Loopback, 16001);
@@ -32,33 +28,28 @@ namespace BranchOffice
                 Console.WriteLine("Shutdown requested (Ctrl+C).");
             };
 
-            int maxClients = 10;
-
             try
             {
                 serverSocket.Connect(serverEP);
                 Console.WriteLine("Connected to server successfully.");
                 serverSocket.Blocking = false;
+
+                ReceiveServerEncKey(serverSocket);
+
+                int timeout = 500 * 1000;
+
+                List<EndPoint> knownClients = new List<EndPoint>();
+                Queue<EndPoint> pendingReplies = new Queue<EndPoint>();
+
+                while (!cts.IsCancellationRequested)
+                {
+                    Polling(serverSocket, branchSocket, timeout, knownClients, pendingReplies);
+                    Multiplexing(serverSocket, branchSocket, timeout, pendingReplies);
+                }
             }
             catch (SocketException ex)
             {
                 Console.WriteLine($"Failed to connect to server at startup.\nError:{ex.Message}");
-            }
-
-            int timeout = 500 * 1000;
-
-            EndPoint clientEP = null;
-            try
-            {
-                while (!cts.IsCancellationRequested)
-                {
-                    Polling(serverSocket, branchSocket, timeout, ref clientEP);
-                    Multiplexing(serverSocket, branchSocket, maxClients, timeout, ref clientEP);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Unexpected error: {ex.Message}");
             }
             finally
             {
@@ -69,84 +60,79 @@ namespace BranchOffice
             }
         }
 
-        private static void Polling(Socket serverSocket, Socket branchSocket, int timeout, ref EndPoint clientEP)
+        private static void ReceiveServerEncKey(Socket serverSocket)
         {
-            try
-            {
-                byte[] buffer = new byte[8192];
-                EndPoint tempEP = new IPEndPoint(IPAddress.Any, 0);
+            byte[] buffer = new byte[37];
+            int timeoutMicros = 60_000_000;
 
-                if (branchSocket.Poll(timeout, SelectMode.SelectRead))
-                {
-                    int bytesReceived = branchSocket.ReceiveFrom(buffer, ref tempEP);
-                    if (bytesReceived == 0)
-                        return;
-                    clientEP = tempEP;
-                    byte[] data = new byte[bytesReceived];
-                    Buffer.BlockCopy(buffer, 0, data, 0, bytesReceived);
-                    serverSocket.Send(data);
-                }
-
-            }
-            catch (Exception ex)
+            if (serverSocket.Poll(timeoutMicros, SelectMode.SelectRead))
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                int bytes = serverSocket.Receive(buffer);
+                if (bytes == 0)
+                    throw new Exception("Connection closed by server while receiving encryption key.");
+                enc_key = System.Text.Encoding.UTF8.GetString(buffer, 0, bytes);
+                Console.WriteLine("Received enc_key from server");
             }
         }
-        private static void Multiplexing(Socket serverSocket, Socket branchSocket, int maxClients, int timeout, ref EndPoint clientEP)
+
+        private static void Polling(Socket serverSocket, Socket branchSocket, int timeout, List<EndPoint> knownClientEPs, Queue<EndPoint> pendingReplies)
         {
-            if (clientEP == null)
+            byte[] buffer = new byte[8192];
+            EndPoint tempEP = new IPEndPoint(IPAddress.Any, 0);
+
+            if (!branchSocket.Poll(timeout, SelectMode.SelectRead))
+                return;
+
+            int bytesReceived = branchSocket.ReceiveFrom(buffer, ref tempEP);
+            if (bytesReceived == 0)
+                return;
+
+            if (!knownClientEPs.Contains(tempEP))
+            {
+                knownClientEPs.Add(tempEP);
+                Console.WriteLine($"New client detected: {tempEP}");
+
+                byte[] keyBytes = System.Text.Encoding.UTF8.GetBytes(enc_key);
+                branchSocket.SendTo(keyBytes, tempEP);
+                Console.WriteLine($"Sent enc_key to new client {tempEP}");
+            }
+
+            if (bytesReceived == 1 && buffer[0] == 0x00)
+                return;
+
+            byte[] data = new byte[bytesReceived];
+            Buffer.BlockCopy(buffer, 0, data, 0, bytesReceived);
+            serverSocket.Send(data);
+
+            pendingReplies.Enqueue(tempEP);
+        }
+
+        private static void Multiplexing(Socket serverSocket, Socket branchSocket, int timeout, Queue<EndPoint> pendingReplies)
+        {
+            if (!serverSocket.Poll(timeout, SelectMode.SelectRead))
                 return;
 
             byte[] recvBuffer = new byte[8192];
+            int bytesRead = serverSocket.Receive(recvBuffer);
 
-            try
+            if (bytesRead == 0)
             {
-                List<Socket> checkRead = new List<Socket>() { serverSocket };
-                List<Socket> checkError = new List<Socket>() { serverSocket };
-
-                Socket.Select(checkRead, null, checkError, timeout);
-
-                if (checkRead.Count == 0 && checkError.Count == 0)
-                    return;
-
-                if (checkError.Count > 0)
-                {
-                    foreach (Socket s in checkError)
-                    {
-                        Console.WriteLine($"Socket error on {s.RemoteEndPoint}, closing socket.");
-                        s.Close();
-                    }
-                }
-
-                foreach (Socket s in checkRead)
-                {
-                    int bytesRead = s.Receive(recvBuffer);
-
-                    if (bytesRead == 0)
-                    {
-                        Console.WriteLine($"Client disconnected: {s.RemoteEndPoint}");
-                        s.Close();
-                        continue;
-                    }
-                    byte[] frame = new byte[bytesRead];
-                    Buffer.BlockCopy(recvBuffer, 0, frame, 0, bytesRead);
-                    branchSocket.SendTo(frame, clientEP);
-                    clientEP = null;
-                }
-
-                checkRead.Clear();
-                checkError.Clear();
-
+                Console.WriteLine($"Server closed connection: {serverSocket.RemoteEndPoint}");
+                serverSocket.Close();
+                return;
             }
-            catch (SocketException ex)
+
+            if (pendingReplies.Count == 0)
             {
-                Console.WriteLine($"Socket error ERROR CODE : {ex.SocketErrorCode}");
+                Console.WriteLine("Warning: received server response with no pending client. Dropping.");
+                return;
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}");
-            }
+
+            EndPoint targetClient = pendingReplies.Dequeue();
+
+            byte[] frame = new byte[bytesRead];
+            Buffer.BlockCopy(recvBuffer, 0, frame, 0, bytesRead);
+            branchSocket.SendTo(frame, targetClient);
         }
     }
 }

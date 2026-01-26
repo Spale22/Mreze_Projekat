@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 
 namespace Server
@@ -14,14 +15,12 @@ namespace Server
         static readonly ITransactionRepository transactionRepository = new TransactionRepository(clientRepository);
         static readonly AuthenticationService authenticationService = new AuthenticationService(clientRepository);
         const int maxClients = 10;
+
+        private static string enc_key = "";
         static void Main(string[] args)
         {
             DatabaseSeeder.Seed(clientRepository, transactionRepository);
-            Run();
-        }
 
-        static void Run()
-        {
             Socket listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             IPEndPoint listenEndPoint = new IPEndPoint(IPAddress.Loopback, 15000);
             listenSocket.Blocking = false;
@@ -30,6 +29,11 @@ namespace Server
 
             try
             {
+                while (string.IsNullOrWhiteSpace(enc_key) || enc_key.Length > 36)
+                {
+                    Console.WriteLine("Input communication encryption key ([A-Z] [0-9] max_length 36):");
+                    enc_key = Console.ReadLine();
+                }
                 Multiplexing(listenSocket);
             }
             catch
@@ -101,6 +105,7 @@ namespace Server
                             clientSocket.Blocking = false;
                             readSockets.Add(clientSocket);
                             Console.WriteLine($"New client connected: {clientSocket.RemoteEndPoint}");
+                            clientSocket.Send(Encoding.UTF8.GetBytes(enc_key));
                             continue;
                         }
 
@@ -116,7 +121,11 @@ namespace Server
                         byte[] frame = new byte[bytesRead];
                         Buffer.BlockCopy(recvBuffer, 0, frame, 0, bytesRead);
 
-                        HandleRequest(s, frame, bytesRead);
+                        byte[] data = Encryptor.Decrypt(enc_key, frame);
+                        if (data == null || data.Length == 0)
+                            throw new Exception("Decryption failed or resulted in empty data.");
+
+                        HandleRequest(s, data, bytesRead);
                     }
 
                     checkRead.Clear();
@@ -143,26 +152,25 @@ namespace Server
 
         private static void HandleRequest(Socket s, byte[] buffer, int bytesRead)
         {
-            PackageType pkgType;
-            Object obj;
-            (pkgType, obj) = SerializationHelper.Deserialize<object>(buffer);
-            switch (pkgType)
+            Object obj = SerializationHelper.Deserialize<object>(buffer);
+            switch (obj)
             {
-                case PackageType.AuthRequest:
-                    AuthRequestDTO authDto = (AuthRequestDTO)obj;
+                case AuthRequestDTO authDto:
                     HandleAuthRequest(s, authDto);
                     break;
-                case PackageType.TransactionRequest:
-                    Transaction transactionDto = (Transaction)obj; ;
+                case Transaction transactionDto:
                     HandleTransactionRequest(s, transactionDto);
                     break;
-                case PackageType.BalanceInquiryRequest:
-                    Guid clientId = (Guid)obj;
+                case Guid clientId:
                     HandleBalanceInquiryRequest(s, clientId);
                     break;
+                case null:
+                    Console.WriteLine("Received null package payload.");
+                    break;
                 default:
-                    IPEndPoint senderEP = (IPEndPoint)s.LocalEndPoint;
-                    Console.WriteLine($"Unknown package type received, from {senderEP.Address}:{senderEP.Port}");
+                    IPEndPoint senderEP = s.RemoteEndPoint as IPEndPoint;
+                    string addr = senderEP != null ? $"{senderEP.Address}:{senderEP.Port}" : "unknown endpoint";
+                    Console.WriteLine($"Unknown package type received ({obj.GetType().FullName}), from {addr}");
                     break;
             }
         }
@@ -172,13 +180,22 @@ namespace Server
             try
             {
                 double balance = clientRepository.GetClientBalance(clientId);
-                byte[] responseBytes = SerializationHelper.Serialize(PackageType.BalanceInquiryResponse, balance);
-                s.Send(responseBytes);
+                byte[] responseBytes = SerializationHelper.Serialize(balance);
+                byte[] data = Encryptor.Encrypt(enc_key, responseBytes);
+                if (data == null || data.Length == 0)
+                    throw new Exception("Ecryption failed or resulted in empty data.");
+
+                s.Send(data);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Balance inquiry error: {ex.Message}");
-                s.Send(SerializationHelper.Serialize(PackageType.MessageNotification, ex.Message));
+                byte[] msgBytes = SerializationHelper.Serialize(ex.Message);
+                byte[] data = Encryptor.Encrypt(enc_key, msgBytes);
+                if (data == null || data.Length == 0)
+                    throw new Exception("Ecryption failed or resulted in empty data.");
+
+                s.Send(data);
             }
         }
         private static void HandleAuthRequest(Socket s, AuthRequestDTO dto)
@@ -186,13 +203,22 @@ namespace Server
             try
             {
                 User result = authenticationService.Authenticate(dto);
-                byte[] responseBytes = SerializationHelper.Serialize(PackageType.AuthResponse, result);
-                s.Send(responseBytes);
+                byte[] responseBytes = SerializationHelper.Serialize(result);
+                byte[] data = Encryptor.Encrypt(enc_key, responseBytes);
+                if (data == null || data.Length == 0)
+                    throw new Exception("Ecryption failed or resulted in empty data.");
+
+                s.Send(data);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Authentication error: {ex.Message}");
-                s.Send(SerializationHelper.Serialize(PackageType.MessageNotification, ex.Message));
+                byte[] msgBytes = SerializationHelper.Serialize(ex.Message);
+                byte[] data = Encryptor.Encrypt(enc_key, msgBytes);
+                if (data == null || data.Length == 0)
+                    throw new Exception("Ecryption failed or resulted in empty data.");
+
+                s.Send(data);
             }
         }
 
@@ -201,13 +227,22 @@ namespace Server
             try
             {
                 bool result = transactionRepository.Create(dto);
-                byte[] responseBytes = SerializationHelper.Serialize(PackageType.TransactionResponse, result);
-                s.Send(responseBytes);
+                byte[] responseBytes = SerializationHelper.Serialize(result);
+                byte[] data = Encryptor.Encrypt(enc_key, responseBytes);
+                if (data == null || data.Length == 0)
+                    throw new Exception("Ecryption failed or resulted in empty data.");
+
+                s.Send(data);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Transaction processing error: {ex.Message}");
-                s.Send(SerializationHelper.Serialize(PackageType.MessageNotification, ex.Message));
+                byte[] msgBytes = SerializationHelper.Serialize(ex.Message);
+                byte[] data = Encryptor.Encrypt(enc_key, msgBytes);
+                if (data == null || data.Length == 0)
+                    throw new Exception("Ecryption failed or resulted in empty data.");
+
+                s.Send(data);
             }
         }
     }

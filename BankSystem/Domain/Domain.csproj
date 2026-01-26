@@ -41,7 +41,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Enumerations\PackageType.cs" />
     <Compile Include="Enumerations\TransactionType.cs" />
     <Compile Include="Interfaces\Repositories\ITransactionRepository.cs" />
     <Compile Include="Interfaces\Repositories\IClientRepository.cs" />

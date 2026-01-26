@@ -9,17 +9,10 @@ namespace Client
 {
     public class Client
     {
+        private static string enc_key = "";
         static void Main(string[] args)
         {
-            Run();
-        }
-
-        static void Run()
-        {
             Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-
-            IPEndPoint localEP = new IPEndPoint(IPAddress.Loopback, 0);
-            clientSocket.Bind(localEP);
             clientSocket.Blocking = false;
 
             IPEndPoint branchEP = new IPEndPoint(IPAddress.Loopback, 16001);
@@ -33,22 +26,21 @@ namespace Client
                 Console.WriteLine("Shutdown requested (Ctrl+C).");
             };
 
-            Console.WriteLine("UDP Client started.");
-            Console.WriteLine("-----------------------------");
-            Console.WriteLine("Press Ctrl+C to exit.");
-            Console.WriteLine("-----------------------------");
-
-            User currentUser = new User();
             try
             {
+                Console.WriteLine("UDP Client started.");
+                Console.WriteLine("-----------------------------");
+                Console.WriteLine("Press Ctrl+C to exit.");
+                Console.WriteLine("-----------------------------");
+
+                User currentUser = new User();
+
+                GetEncKey(clientSocket, branchEP);
+
                 while (!cts.IsCancellationRequested)
                 {
                     while (currentUser.UserId == Guid.Empty && !cts.IsCancellationRequested)
                         currentUser = UserLogin(clientSocket, branchEP, ref cts);
-
-                    Console.WriteLine("-----------------------------");
-                    Console.WriteLine($"Welcome, {currentUser.FirstName} {currentUser.LastName}!");
-                    Console.WriteLine("-----------------------------");
 
                     if (cts.IsCancellationRequested)
                         break;
@@ -104,11 +96,32 @@ namespace Client
             }
         }
 
+        private static void GetEncKey(Socket clientSocket, IPEndPoint branchEP)
+        {
+            clientSocket.SendTo(new byte[] { 0x00 }, branchEP);
+            byte[] key_buffer = new byte[37];
+            EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+            int timeoutMicros = 60_000_000;
+            if (clientSocket.Poll(timeoutMicros, SelectMode.SelectRead))
+            {
+                int recievedBytes = clientSocket.ReceiveFrom(key_buffer, ref remoteEP);
+                if (recievedBytes == 0)
+                    throw new Exception("Failed to receive encryption key from server.");
+                enc_key = System.Text.Encoding.UTF8.GetString(key_buffer, 0, recievedBytes);
+                Console.WriteLine("Received encryption key from branch office");
+            }
+            else
+                throw new Exception("No response within timeout.");
+        }
+
         private static Object SendAndAwaitResponse(Socket clientSocket, IPEndPoint branchEP, byte[] payload)
         {
-            clientSocket.SendTo(payload, branchEP);
+            byte[] encryptedPayload = Encryptor.Encrypt(enc_key, payload);
+            if (encryptedPayload == null || encryptedPayload.Length == 0)
+                throw new Exception("Ecryption failed or resulted in empty data.");
+
+            clientSocket.SendTo(encryptedPayload, branchEP);
             Object result = null;
-            PackageType pkgType;
 
             int timeoutMicros = 2_000_000;
             byte[] buffer = new byte[8192];
@@ -121,20 +134,23 @@ namespace Client
                     throw new Exception("Received zero bytes from server.");
                 byte[] frame = new byte[bytesRead];
                 Buffer.BlockCopy(buffer, 0, frame, 0, bytesRead);
-                (pkgType, result) = SerializationHelper.Deserialize<Object>(frame);
-                if (pkgType == PackageType.MessageNotification)
+                byte[] data = Encryptor.Decrypt(enc_key, frame);
+                if (data == null || data.Length == 0)
+                    throw new Exception("Decryption failed or resulted in empty data.");
+                result = SerializationHelper.Deserialize<Object>(data);
+                if (result.GetType() == typeof(string))
                     throw new Exception("Message from server: " + (string)result);
             }
             else
                 throw new Exception("No response within timeout.");
-            
+
             return result;
         }
         private static void HandleBalanceInquiry(Socket clientSocket, IPEndPoint branchEP, ref User currentUser)
         {
             Console.WriteLine("Balance Inquiry Operation");
             Console.WriteLine("-----------------------------");
-            byte[] payload = SerializationHelper.Serialize(PackageType.BalanceInquiryRequest, currentUser.UserId);
+            byte[] payload = SerializationHelper.Serialize(currentUser.UserId);
             try
             {
                 double balance = (double)SendAndAwaitResponse(clientSocket, branchEP, payload);
@@ -157,7 +173,7 @@ namespace Client
             Console.Write("Input amount: ");
             double amount = Double.Parse(Console.ReadLine() ?? "");
             Transaction t = new Transaction(currentUser.UserId, amount, DateTime.Now, TransactionType.Deposit);
-            byte[] payload = SerializationHelper.Serialize(PackageType.TransactionRequest, t);
+            byte[] payload = SerializationHelper.Serialize(t);
 
             try
             {
@@ -179,7 +195,7 @@ namespace Client
             Console.Write("Input amount: ");
             double amount = Double.Parse(Console.ReadLine() ?? "");
             Transaction t = new Transaction(currentUser.UserId, amount, DateTime.Now, TransactionType.Withdraw);
-            byte[] payload = SerializationHelper.Serialize(PackageType.TransactionRequest, t);
+            byte[] payload = SerializationHelper.Serialize(t);
 
             try
             {
@@ -203,7 +219,7 @@ namespace Client
             Console.Write("Input recipient account number: ");
             string recipientAccountNumber = Console.ReadLine() ?? "";
             Transaction t = new Transaction(currentUser.UserId, amount, DateTime.Now, TransactionType.Transfer, recipientAccountNumber);
-            byte[] payload = SerializationHelper.Serialize(PackageType.TransactionRequest, t);
+            byte[] payload = SerializationHelper.Serialize(t);
 
             try
             {
@@ -218,12 +234,16 @@ namespace Client
                 Console.WriteLine($"Transfer failed:\n {ex.Message}");
             }
         }
-        private static User UserLogin(Socket clientSocket, IPEndPoint branchEP,ref CancellationTokenSource cts)
+        private static User UserLogin(Socket clientSocket, IPEndPoint branchEP, ref CancellationTokenSource cts)
         {
             Console.WriteLine("User Login");
             Console.WriteLine("-----------------------------");
             Console.Write("Enter username: ");
             string username = Console.ReadLine();
+
+            if (cts.IsCancellationRequested)
+                return new User();
+
             Console.Write("Enter password: ");
             string password = Console.ReadLine();
 
@@ -235,10 +255,14 @@ namespace Client
                 Username = username,
                 Password = password
             };
-            byte[] payload = SerializationHelper.Serialize(PackageType.AuthRequest, authRequest);
+            byte[] payload = SerializationHelper.Serialize(authRequest);
             try
             {
                 User dto = (User)SendAndAwaitResponse(clientSocket, branchEP, payload);
+
+                Console.WriteLine("-----------------------------");
+                Console.WriteLine($"Welcome, {dto.FirstName} {dto.LastName}!");
+                Console.WriteLine("-----------------------------");
                 return dto;
             }
             catch (Exception ex)

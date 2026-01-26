@@ -63,7 +63,7 @@ namespace Domain
             return lut;
         }
 
-        public static string Encrypt(string key, string input)
+        public static byte[] Encrypt(string key, byte[] input)
         {
             if (string.IsNullOrWhiteSpace(key) || input == null)
                 return null;
@@ -73,11 +73,11 @@ namespace Domain
             if (lut.Count == 0)
                 return null;
 
-            char[] result = new char[input.Length];
+            byte[] result = new byte[input.Length];
 
             for (int i = 0; i < input.Length; i++)
             {
-                char original = input[i];
+                char original = (char)input[i];
                 char c = char.ToUpperInvariant(original);
 
                 if (lut.TryGetValue(c, out char mapped))
@@ -85,18 +85,18 @@ namespace Domain
                     if (char.IsLetter(original) && char.IsLower(original))
                         mapped = char.ToLowerInvariant(mapped);
 
-                    result[i] = mapped;
+                    result[i] = (byte)mapped;
                 }
                 else
                 {
-                    result[i] = original;
+                    result[i] = (byte)original;
                 }
             }
 
-            return new string(result);
+            return result;
         }
 
-        public static string Decrypt(string key, string input)
+        public static byte[] Decrypt(string key, byte[] input)
         {
             if (string.IsNullOrWhiteSpace(key) || input == null)
                 return null;
@@ -106,11 +106,11 @@ namespace Domain
             if (lut.Count == 0)
                 return null;
 
-            char[] result = new char[input.Length];
+            byte[] result = new byte[input.Length];
 
             for (int i = 0; i < input.Length; i++)
             {
-                char original = input[i];
+                char original = (char)input[i];
                 char c = char.ToUpperInvariant(original);
 
                 if (lut.TryGetValue(c, out char mapped))
@@ -118,15 +118,15 @@ namespace Domain
                     if (char.IsLetter(original) && char.IsLower(original))
                         mapped = char.ToLowerInvariant(mapped);
 
-                    result[i] = mapped;
+                    result[i] = (byte)mapped;
                 }
                 else
                 {
-                    result[i] = original;
+                    result[i] = (byte)original;
                 }
             }
 
-            return new string(result);
+            return result;
         }
     }
 }

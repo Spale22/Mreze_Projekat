@@ -5,26 +5,24 @@ namespace Domain
 {
     public static class SerializationHelper
     {
-        public static byte[] Serialize<T>(PackageType pkgType, T obj)
+        public static byte[] Serialize<T>(T obj)
         {
             byte[] dataBuffer;
             using (MemoryStream ms = new MemoryStream())
             {
-                ms.WriteByte((byte)pkgType);
                 BinaryFormatter bf = new BinaryFormatter();
                 bf.Serialize(ms, obj);
                 dataBuffer = ms.ToArray();
                 return dataBuffer;
             }
         }
-        public static (PackageType, T) Deserialize<T>(byte[] data)
+        public static T Deserialize<T>(byte[] data)
         {
-            using (MemoryStream ms = new MemoryStream(data))
+            using (Stream ms = new MemoryStream(data))
             {
-                var pkgType = (PackageType)ms.ReadByte();
                 BinaryFormatter bf = new BinaryFormatter();
                 object obj = bf.Deserialize(ms);
-                return (pkgType, (T)obj);
+                return (T)obj;
             }
         }
     }

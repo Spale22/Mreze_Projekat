@@ -15,11 +15,11 @@ namespace Infrastructure
                 for (int k = 0; k < 5; k++)
                 {
                     var transactionW = new Transaction(client.UserId, 100, DateTime.Now, TransactionType.Withdraw);
-                   
+
                     transactionRepository.Create(transactionW);
 
-                    var transactionD = new Transaction(client.UserId,k*100,DateTime.Now, TransactionType.Deposit);
-                   
+                    var transactionD = new Transaction(client.UserId, k * 100, DateTime.Now, TransactionType.Deposit);
+
                     transactionRepository.Create(transactionD);
                 }
             }

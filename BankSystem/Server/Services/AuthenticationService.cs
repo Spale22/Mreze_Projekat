@@ -15,7 +15,7 @@ namespace Server
         {
             var client = clientRepository.GetByUsername(request.Username);
             if (client == null || client.Password != request.Password)
-                 throw new UnauthorizedAccessException("Invalid username or password.");
+                throw new UnauthorizedAccessException("Invalid username or password.");
             return client;
         }
     }
