@@ -4,7 +4,7 @@
     {
         Unknown,
         Deposit,
-        Withdrawal,
+        Withdraw,
         Transfer
     }
 }

@@ -1,11 +1,12 @@
-﻿using Infrastructure;
+﻿using Domain;
+using Infrastructure;
 using System;
 
 namespace Server
 {
     public class TransactionService
     {
-        public TransactionResponseDTO ProcessTransaction(TransactionRequestDTO request)
+        public TransactionResponseDTO ProcessTransaction(Transaction request)
         {
             throw new NotImplementedException();
         }

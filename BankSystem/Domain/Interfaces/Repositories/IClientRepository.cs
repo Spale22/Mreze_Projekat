@@ -5,11 +5,11 @@ namespace Domain
 {
     public interface IClientRepository
     {
-        bool CreateClient(Client newClient);
+        bool CreateClient(User newClient);
         bool DeleteClient(Guid clientId);
-        bool UpdateClient(Guid clientId, Client updatedClient);
-        Client GetClientById(Guid clientId);
-        IEnumerable<Client> GetAllClients();
+        bool UpdateClient(Guid clientId, User updatedClient);
+        User GetClientById(Guid clientId);
+        IEnumerable<User> GetAllClients();
         bool UpdateClientBalance(Guid clientId, double newBalance);
     }
 }

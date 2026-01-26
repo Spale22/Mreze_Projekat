@@ -9,7 +9,7 @@ namespace Infrastructure
         {
             for (int i = 0; i < 5; i++)
             {
-                var client = new Client
+                var client = new User
                 {
                     FirstName = $"Client{i}",
                     LastName = $"Client{i}",

@@ -142,13 +142,9 @@ namespace Server
                     HandleAuthRequest(s, authDto);
                     break;
                 case PackageType.TransactionRequest:
-                    TransactionRequestDTO transactionDto = (TransactionRequestDTO)obj; ;
+                    Transaction transactionDto = (Transaction)obj; ;
                     HandleTransactionRequest(s, transactionDto);
-                    break;
-                case PackageType.ClientDataRequest:
-                    ClientDataRequestDTO clientDataDto = (ClientDataRequestDTO)obj;
-                    HandleClientDataRequest(s, clientDataDto);
-                    break;
+                    break;                
                 default:
                     IPEndPoint senderEP = (IPEndPoint)s.LocalEndPoint;
                     Console.WriteLine($"Unknown package type received, from {senderEP.Address}:{senderEP.Port}");
@@ -163,17 +159,10 @@ namespace Server
             s.Send(responseBytes);
         }
 
-        private static void HandleTransactionRequest(Socket s, TransactionRequestDTO dto)
+        private static void HandleTransactionRequest(Socket s, Transaction dto)
         {
             TransactionResponseDTO result = transactionService.ProcessTransaction(dto);
             byte[] responseBytes = SerializationHelper.Serialize(PackageType.TransactionResponse, result);
-            s.Send(responseBytes);
-        }
-
-        private static void HandleClientDataRequest(Socket s, ClientDataRequestDTO dto)
-        {
-            ClientDataResponseDTO result = clientDataService.GetClientData(dto);
-            byte[] responseBytes = SerializationHelper.Serialize(PackageType.ClientDataResponse, result);
             s.Send(responseBytes);
         }
     }

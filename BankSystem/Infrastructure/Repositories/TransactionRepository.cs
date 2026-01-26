@@ -27,12 +27,12 @@ namespace Infrastructure
 
                     client.Balance += newTransaction.Amount;
 
-                    if (!clientRepository.UpdateClientBalance(client.ClientId, client.Balance))
+                    if (!clientRepository.UpdateClientBalance(client.UserId, client.Balance))
                         return false;
 
                     break;
 
-                case TransactionType.Withdrawal:
+                case TransactionType.Withdraw:
 
                     var withdrawClient = clientRepository.GetClientById(newTransaction.SenderId);
 
@@ -41,7 +41,7 @@ namespace Infrastructure
 
                     withdrawClient.Balance -= newTransaction.Amount;
 
-                    if (!clientRepository.UpdateClientBalance(withdrawClient.ClientId, withdrawClient.Balance))
+                    if (!clientRepository.UpdateClientBalance(withdrawClient.UserId, withdrawClient.Balance))
                         return false;
 
                     break;
@@ -57,10 +57,10 @@ namespace Infrastructure
                     senderClient.Balance -= newTransaction.Amount;
                     recipientClient.Balance += newTransaction.Amount;
 
-                    if (!clientRepository.UpdateClientBalance(senderClient.ClientId, senderClient.Balance))
+                    if (!clientRepository.UpdateClientBalance(senderClient.UserId, senderClient.Balance))
                         return false;
 
-                    if (!clientRepository.UpdateClientBalance(recipientClient.ClientId, recipientClient.Balance))
+                    if (!clientRepository.UpdateClientBalance(recipientClient.UserId, recipientClient.Balance))
                         return false;
 
                     break;
