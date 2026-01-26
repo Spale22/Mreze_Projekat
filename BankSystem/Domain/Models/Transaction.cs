@@ -12,10 +12,11 @@ namespace Domain
         public DateTime Timestamp { get; set; } = DateTime.MinValue;
         public TransactionType Type { get; set; } = TransactionType.Unknown;
         public Transaction() { }
-        public Transaction(Guid senderClientId, double amount, TransactionType type, string accountNumber = "")
+        public Transaction(Guid senderClientId, double amount, DateTime timestamp, TransactionType type, string accountNumber = "")
         {
             TransactionId = Guid.NewGuid();
             SenderId = senderClientId;
+            Timestamp = timestamp;
             RecipientAccountNumber = accountNumber;
             Amount = amount;
             Timestamp = DateTime.UtcNow;

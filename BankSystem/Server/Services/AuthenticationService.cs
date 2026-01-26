@@ -1,12 +1,22 @@
-﻿using Infrastructure;
+﻿using Domain;
+using Infrastructure;
+using System;
 
 namespace Server
 {
     public class AuthenticationService
     {
-        public AuthResponseDTO Authenticate(AuthRequestDTO request)
+        private readonly IClientRepository clientRepository;
+        public AuthenticationService(IClientRepository _clientRepository)
         {
-            throw new System.NotImplementedException();
+            clientRepository = _clientRepository;
+        }
+        public User Authenticate(AuthRequestDTO request)
+        {
+            var client = clientRepository.GetByUsername(request.Username);
+            if (client == null || client.Password != request.Password)
+                 throw new UnauthorizedAccessException("Invalid username or password.");
+            return client;
         }
     }
 }

@@ -17,6 +17,11 @@ namespace Infrastructure
 
         public IEnumerable<User> GetAllClients()
             => clients.Values;
+        public User GetByUsername(string username)
+            => clients.Values.FirstOrDefault(c => c.Username == username);
+
+        public double GetClientBalance(Guid clientId)
+            => clients.TryGetValue(clientId, out var client) ? client.Balance : -1;
 
         public User GetClientByAccountNumber(string accountNumber)
             => clients.Values.FirstOrDefault(c => c.AccountNumber == accountNumber);

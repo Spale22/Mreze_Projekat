@@ -43,8 +43,6 @@
   <ItemGroup>
     <Compile Include="Database\DatabaseSeeder.cs" />
     <Compile Include="DTOs\AuthRequestDTO.cs" />
-    <Compile Include="DTOs\AuthResponseDTO.cs" />
-    <Compile Include="DTOs\TransactionResponseDTO.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Repositories\TransactionRepository.cs" />
     <Compile Include="Repositories\ClientRepository.cs" />

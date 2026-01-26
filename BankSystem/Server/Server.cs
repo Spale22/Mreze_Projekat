@@ -10,11 +10,13 @@ namespace Server
 {
     public class Server
     {
-        static readonly TransactionService transactionService = new TransactionService();
-        static readonly AuthenticationService authenticationService = new AuthenticationService();
+        static readonly IClientRepository clientRepository = new ClientRepository();
+        static readonly ITransactionRepository transactionRepository = new TransactionRepository(clientRepository);
+        static readonly AuthenticationService authenticationService = new AuthenticationService(clientRepository);
         const int maxClients = 10;
         static void Main(string[] args)
         {
+            DatabaseSeeder.Seed(clientRepository, transactionRepository);
             Run();
         }
 
@@ -26,11 +28,21 @@ namespace Server
             listenSocket.Bind(listenEndPoint);
             listenSocket.Listen(maxClients);
 
-            Multiplexing(listenSocket);
-
-            listenSocket.Close();
-            Console.WriteLine("Shutting down server...");
-            Console.ReadKey();
+            try
+            {
+                Multiplexing(listenSocket);
+            }
+            catch
+            (Exception ex)
+            {
+                Console.WriteLine($"Server error: {ex.Message}");
+            }
+            finally
+            {
+                listenSocket.Close();
+                Console.WriteLine("Shutting down server...");
+                Console.ReadKey();
+            }
         }
 
         private static void Multiplexing(Socket listener)
@@ -143,7 +155,11 @@ namespace Server
                 case PackageType.TransactionRequest:
                     Transaction transactionDto = (Transaction)obj; ;
                     HandleTransactionRequest(s, transactionDto);
-                    break;                
+                    break;
+                case PackageType.BalanceInquiryRequest:
+                    Guid clientId = (Guid)obj;
+                    HandleBalanceInquiryRequest(s, clientId);
+                    break;
                 default:
                     IPEndPoint senderEP = (IPEndPoint)s.LocalEndPoint;
                     Console.WriteLine($"Unknown package type received, from {senderEP.Address}:{senderEP.Port}");
@@ -151,18 +167,48 @@ namespace Server
             }
         }
 
+        private static void HandleBalanceInquiryRequest(Socket s, Guid clientId)
+        {
+            try
+            {
+                double balance = clientRepository.GetClientBalance(clientId);
+                byte[] responseBytes = SerializationHelper.Serialize(PackageType.BalanceInquiryResponse, balance);
+                s.Send(responseBytes);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Balance inquiry error: {ex.Message}");
+                s.Send(SerializationHelper.Serialize(PackageType.MessageNotification, ex.Message));
+            }
+        }
         private static void HandleAuthRequest(Socket s, AuthRequestDTO dto)
         {
-            AuthResponseDTO result = authenticationService.Authenticate(dto);
-            byte[] responseBytes = SerializationHelper.Serialize(PackageType.AuthResponse, result);
-            s.Send(responseBytes);
+            try
+            {
+                User result = authenticationService.Authenticate(dto);
+                byte[] responseBytes = SerializationHelper.Serialize(PackageType.AuthResponse, result);
+                s.Send(responseBytes);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Authentication error: {ex.Message}");
+                s.Send(SerializationHelper.Serialize(PackageType.MessageNotification, ex.Message));
+            }
         }
 
         private static void HandleTransactionRequest(Socket s, Transaction dto)
         {
-            TransactionResponseDTO result = transactionService.ProcessTransaction(dto);
-            byte[] responseBytes = SerializationHelper.Serialize(PackageType.TransactionResponse, result);
-            s.Send(responseBytes);
+            try
+            {
+                bool result = transactionRepository.Create(dto);
+                byte[] responseBytes = SerializationHelper.Serialize(PackageType.TransactionResponse, result);
+                s.Send(responseBytes);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Transaction processing error: {ex.Message}");
+                s.Send(SerializationHelper.Serialize(PackageType.MessageNotification, ex.Message));
+            }
         }
     }
 }

@@ -48,16 +48,25 @@ namespace BranchOffice
             int timeout = 500 * 1000;
 
             EndPoint clientEP = null;
-
-            while (!cts.IsCancellationRequested)
+            try
             {
-                Polling(serverSocket, branchSocket, timeout, ref clientEP);
-                Multiplexing(serverSocket, branchSocket, maxClients, timeout, ref clientEP);
+                while (!cts.IsCancellationRequested)
+                {
+                    Polling(serverSocket, branchSocket, timeout, ref clientEP);
+                    Multiplexing(serverSocket, branchSocket, maxClients, timeout, ref clientEP);
+                }
             }
-            branchSocket.Close();
-            serverSocket.Close();
-            Console.WriteLine("Branch office shutting down...");
-            Console.ReadKey();
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error: {ex.Message}");
+            }
+            finally
+            {
+                branchSocket.Close();
+                serverSocket.Close();
+                Console.WriteLine("Branch office shutting down...");
+                Console.ReadKey();
+            }
         }
 
         private static void Polling(Socket serverSocket, Socket branchSocket, int timeout, ref EndPoint clientEP)
