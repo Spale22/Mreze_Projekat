@@ -86,7 +86,58 @@ namespace BranchOffice
         }
         private static void Multiplexing(Socket serverSocket, Socket branchSocket, int maxClients, int timeout, ref EndPoint clientEP)
         {
-            
+            if (clientEP == null)
+                return;
+
+            byte[] recvBuffer = new byte[8192];
+
+            try
+            {
+                List<Socket> checkRead = new List<Socket>() { serverSocket };
+                List<Socket> checkError = new List<Socket>() { serverSocket };
+
+                Socket.Select(checkRead, null, checkError, timeout);
+
+                if (checkRead.Count == 0 && checkError.Count == 0)
+                    return;
+
+                if (checkError.Count > 0)
+                {
+                    foreach (Socket s in checkError)
+                    {
+                        Console.WriteLine($"Socket error on {s.RemoteEndPoint}, closing socket.");
+                        s.Close();
+                    }
+                }
+
+                foreach (Socket s in checkRead)
+                {
+                    int bytesRead = s.Receive(recvBuffer);
+
+                    if (bytesRead == 0)
+                    {
+                        Console.WriteLine($"Client disconnected: {s.RemoteEndPoint}");
+                        s.Close();
+                        continue;
+                    }
+                    byte[] frame = new byte[bytesRead];
+                    Buffer.BlockCopy(recvBuffer, 0, frame, 0, bytesRead);
+                    branchSocket.SendTo(frame, clientEP);
+                    clientEP = null;
+                }
+
+                checkRead.Clear();
+                checkError.Clear();
+
+            }
+            catch (SocketException ex)
+            {
+                Console.WriteLine($"Socket error ERROR CODE : {ex.SocketErrorCode}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
         }
     }
 }
