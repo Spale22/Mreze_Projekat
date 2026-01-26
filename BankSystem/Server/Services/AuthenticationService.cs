@@ -1,9 +1,8 @@
-﻿using Domain.DTOs;
-using Domain.Interfaces.Services;
+﻿using Infrastructure;
 
-namespace Server.Services
+namespace Server
 {
-    public class AuthenticationService : IAuthenticationService
+    public class AuthenticationService
     {
         public AuthResponseDTO Authenticate(AuthRequestDTO request)
         {

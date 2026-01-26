@@ -1,9 +1,7 @@
-﻿using Domain.Enumerations;
-using Domain.Interfaces.Repositories;
-using Domain.Models;
+﻿using Domain;
 using System;
 
-namespace Infrastructure.Database
+namespace Infrastructure
 {
     public static class DatabaseSeeder
     {

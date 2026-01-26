@@ -1,12 +1,11 @@
-﻿using Domain.Enumerations;
-using System;
+﻿using System;
 
-namespace Domain.Models
+namespace Domain
 {
     [Serializable]
     public class Transaction
     {
-        public Guid TransactionId { get; set; } = Guid.Empty;
+        public Guid TransactionId { get; private set; } = Guid.Empty;
         public Guid SenderId { get; set; } = Guid.Empty;
         public Guid RecipientId { get; set; } = Guid.Empty;
         public double Amount { get; set; } = 0.0;

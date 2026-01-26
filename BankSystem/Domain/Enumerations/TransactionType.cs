@@ -1,4 +1,4 @@
-﻿namespace Domain.Enumerations
+﻿namespace Domain
 {
     public enum TransactionType
     {

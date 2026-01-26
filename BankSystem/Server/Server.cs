@@ -1,7 +1,5 @@
-﻿using Domain.DTOs;
-using Domain.HelperMethods;
-using Domain.Interfaces.Services;
-using Server.Services;
+﻿using Domain;
+using Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -12,48 +10,31 @@ namespace Server
 {
     public class Server
     {
-        static readonly ITransactionService transactionService = new TransactionService();
-        static readonly IAuthenticationService authenticationService = new AuthenticationService();
-        static readonly IClientDataService clientDataService = new ClientDataService();
-
+        static readonly TransactionService transactionService = new TransactionService();
+        static readonly AuthenticationService authenticationService = new AuthenticationService();
+        static readonly ClientDataService clientDataService = new ClientDataService();
+        const int maxClients = 10;
         static void Main(string[] args)
         {
-            Socket authSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            Socket transactionSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            Socket clientDataSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-            authSocket.Blocking = false;
-            transactionSocket.Blocking = false;
-            clientDataSocket.Blocking = false;
-
-            IPEndPoint authReqEndPoint = new IPEndPoint(IPAddress.Loopback, 15001);
-            IPEndPoint transactionReqEndPoint = new IPEndPoint(IPAddress.Loopback, 15002);
-            IPEndPoint clientDataReqEndPoint = new IPEndPoint(IPAddress.Loopback, 15003);
-
-            authSocket.Bind(authReqEndPoint);
-            transactionSocket.Bind(transactionReqEndPoint);
-            clientDataSocket.Bind(clientDataReqEndPoint);
-
-            List<Socket> readSockets = new List<Socket>() { authSocket, transactionSocket, clientDataSocket };
-
-            try
-            {
-                Multiplexing(readSockets);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"An error occurred: {ex.Message}");
-            }
-            finally
-            {
-                authSocket.Close();
-                transactionSocket.Close();
-                clientDataSocket.Close();
-                Console.WriteLine("Shutting down server...");
-            }
+            Run();
         }
 
-        private static void Multiplexing(List<Socket> readSockets)
+        static void Run()
+        {
+            Socket listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            IPEndPoint listenEndPoint = new IPEndPoint(IPAddress.Loopback, 15000);
+            listenSocket.Blocking = false;
+            listenSocket.Bind(listenEndPoint);
+            listenSocket.Listen(maxClients);
+
+            Multiplexing(listenSocket);
+
+            listenSocket.Close();
+            Console.WriteLine("Shutting down server...");
+            Console.ReadKey();
+        }
+
+        private static void Multiplexing(Socket listener)
         {
             var cts = new CancellationTokenSource();
             Console.CancelKeyPress += (sender, e) =>
@@ -63,76 +44,136 @@ namespace Server
                 Console.WriteLine("Shutdown requested (Ctrl+C).");
             };
 
+            List<Socket> readSockets = new List<Socket>();
+
             byte[] recvBuffer = new byte[8192];
-            while (!cts.IsCancellationRequested)
+            try
             {
-                List<Socket> selectSockets = new List<Socket>(readSockets);
-
-                Socket.Select(selectSockets, null, null, 1_000_000);
-
-                foreach (Socket s in selectSockets)
+                while (!cts.IsCancellationRequested)
                 {
-                    try
+                    List<Socket> checkRead = new List<Socket>();
+                    List<Socket> checkError = new List<Socket>();
+
+                    if (readSockets.Count < maxClients)
+                        checkRead.Add(listener);
+
+                    checkError.Add(listener);
+
+                    foreach (Socket s in readSockets)
                     {
-                        int bytesRead = s.Receive(recvBuffer);
-                        if (bytesRead > 0)
+                        checkRead.Add(s);
+                        checkError.Add(s);
+                    }
+
+                    Socket.Select(checkRead, null, checkError, 1_000_000);
+
+                    if (checkRead.Count == 0 && checkError.Count == 0)
+                        continue;
+
+                    if (checkError.Count > 0)
+                    {
+                        foreach (Socket s in checkError)
                         {
-                            int localPort = ((IPEndPoint)s.LocalEndPoint).Port;
-                            switch (localPort)
-                            {
-                                case 15001:
-                                    Console.WriteLine($"[Auth] Received {bytesRead} bytes");
-                                    HandleAuthRequest(s, recvBuffer, bytesRead);
-                                    break;
-                                case 15002:
-                                    Console.WriteLine($"[Transaction] Received {bytesRead} bytes");
-                                    HandleTransactionRequest(s, recvBuffer, bytesRead);
-                                    break;
-                                case 15003:
-                                    Console.WriteLine($"[ClientData] Received {bytesRead} bytes");
-                                    HandleClientDataRequest(s, recvBuffer, bytesRead);
-                                    break;
-                            }
+                            Console.WriteLine($"Socket error on {s.RemoteEndPoint}, closing socket.");
+                            s.Close();
+                            readSockets.Remove(s);
                         }
                     }
-                    catch (SocketException ex)
+
+                    foreach (Socket s in checkRead)
                     {
-                        if (ex.SocketErrorCode == SocketError.WouldBlock)
+                        if (s == listener)
                         {
+                            if (readSockets.Count >= maxClients)
+                                continue;
+                            Socket clientSocket = listener.Accept();
+                            clientSocket.Blocking = false;
+                            readSockets.Add(clientSocket);
+                            Console.WriteLine($"New client connected: {clientSocket.RemoteEndPoint}");
                             continue;
                         }
-                        Console.WriteLine($"Socket error on {((IPEndPoint)s.LocalEndPoint).Port}: {ex.SocketErrorCode}");
+
+                        int bytesRead = s.Receive(recvBuffer);
+
+                        if (bytesRead == 0)
+                        {
+                            Console.WriteLine($"Client disconnected: {s.RemoteEndPoint}");
+                            s.Close();
+                            checkRead.Remove(s);
+                            continue;
+                        }
+                        byte[] frame = new byte[bytesRead];
+                        Buffer.BlockCopy(recvBuffer, 0, frame, 0, bytesRead);
+
+                        HandleRequest(s, frame, bytesRead);
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Socket error on {((IPEndPoint)s.LocalEndPoint).Port}: {ex.Message}");
-                    }
-                    selectSockets.Clear();
+
+                    checkRead.Clear();
+                    checkError.Clear();
                 }
+            }
+            catch (SocketException ex)
+            {
+                Console.WriteLine($"Socket error ERROR CODE : {ex.SocketErrorCode}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
+            finally
+            {
+                foreach (var s in readSockets)
+                {
+                    s.Close();
+                }
+            }
+
+        }
+
+        private static void HandleRequest(Socket s, byte[] buffer, int bytesRead)
+        {
+            PackageType pkgType;
+            Object obj;
+            (pkgType, obj) = SerializationHelper.Deserialize<object>(buffer);
+            switch (pkgType)
+            {
+                case PackageType.AuthRequest:
+                    AuthRequestDTO authDto = (AuthRequestDTO)obj;
+                    HandleAuthRequest(s, authDto);
+                    break;
+                case PackageType.TransactionRequest:
+                    TransactionRequestDTO transactionDto = (TransactionRequestDTO)obj; ;
+                    HandleTransactionRequest(s, transactionDto);
+                    break;
+                case PackageType.ClientDataRequest:
+                    ClientDataRequestDTO clientDataDto = (ClientDataRequestDTO)obj;
+                    HandleClientDataRequest(s, clientDataDto);
+                    break;
+                default:
+                    IPEndPoint senderEP = (IPEndPoint)s.LocalEndPoint;
+                    Console.WriteLine($"Unknown package type received, from {senderEP.Address}:{senderEP.Port}");
+                    break;
             }
         }
 
-        private static void HandleAuthRequest(Socket s, byte[] buffer, int count)
+        private static void HandleAuthRequest(Socket s, AuthRequestDTO dto)
         {
-            AuthRequestDTO dto = SerializationHelper.Deserialize<AuthRequestDTO>(buffer);
             AuthResponseDTO result = authenticationService.Authenticate(dto);
-            byte[] responseBytes = SerializationHelper.Serialize(result);
+            byte[] responseBytes = SerializationHelper.Serialize(PackageType.AuthResponse, result);
             s.Send(responseBytes);
         }
 
-        private static void HandleTransactionRequest(Socket s, byte[] buffer, int count)
+        private static void HandleTransactionRequest(Socket s, TransactionRequestDTO dto)
         {
-            TransactionRequestDTO dto = SerializationHelper.Deserialize<TransactionRequestDTO>(buffer);
             TransactionResponseDTO result = transactionService.ProcessTransaction(dto);
-            byte[] responseBytes = SerializationHelper.Serialize(result);
+            byte[] responseBytes = SerializationHelper.Serialize(PackageType.TransactionResponse, result);
             s.Send(responseBytes);
         }
 
-        private static void HandleClientDataRequest(Socket s, byte[] buffer, int count)
+        private static void HandleClientDataRequest(Socket s, ClientDataRequestDTO dto)
         {
-            ClientDataRequestDTO dto = SerializationHelper.Deserialize<ClientDataRequestDTO>(buffer);
             ClientDataResponseDTO result = clientDataService.GetClientData(dto);
-            byte[] responseBytes = SerializationHelper.Serialize(result);
+            byte[] responseBytes = SerializationHelper.Serialize(PackageType.ClientDataResponse, result);
             s.Send(responseBytes);
         }
     }

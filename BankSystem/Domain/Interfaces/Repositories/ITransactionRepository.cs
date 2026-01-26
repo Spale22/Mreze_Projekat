@@ -1,8 +1,7 @@
-﻿using Domain.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
 
-namespace Domain.Interfaces.Repositories
+namespace Domain
 {
     public interface ITransactionRepository
     {

@@ -1,10 +1,9 @@
-﻿using Domain.DTOs;
-using Domain.Interfaces.Services;
+﻿using Infrastructure;
 using System;
 
-namespace Server.Services
+namespace Server
 {
-    public class ClientDataService : IClientDataService
+    public class ClientDataService
     {
         public ClientDataResponseDTO GetClientData(ClientDataRequestDTO request)
         {
