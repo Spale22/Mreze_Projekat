@@ -2,7 +2,6 @@
 using Domain;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using Infrastructure;
 
 namespace Client
@@ -11,10 +10,6 @@ namespace Client
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("UDP Client started.");
-            Console.WriteLine("-----------------------------");
-            Console.WriteLine("Press Ctrl+C to exit.");
-            Console.WriteLine("-----------------------------");
             Run();
         }
 
@@ -36,6 +31,11 @@ namespace Client
                 cts.Cancel();
                 Console.WriteLine("Shutdown requested (Ctrl+C).");
             };
+
+            Console.WriteLine("UDP Client started.");
+            Console.WriteLine("-----------------------------");
+            Console.WriteLine("Press Ctrl+C to exit.");
+            Console.WriteLine("-----------------------------");
 
             User currentUser;
             do{
@@ -106,9 +106,11 @@ namespace Client
         }
         private static void HandleDeposit(Socket clientSocket, IPEndPoint branchEP, ref User currentUser)
         {
+            Console.WriteLine("Deposit Operation");
+            Console.WriteLine("-----------------------------");
             Console.Write("Input amount: ");
             double amount = Double.Parse(Console.ReadLine() ?? "");
-            Transaction t = new Transaction(currentUser.UserId, currentUser.UserId, amount, TransactionType.Deposit);
+            Transaction t = new Transaction(currentUser.UserId, amount, TransactionType.Deposit);
             byte[] payload = SerializationHelper.Serialize(PackageType.TransactionRequest, t);
 
             try
@@ -126,9 +128,11 @@ namespace Client
         }
         private static void HandleWithdraw(Socket clientSocket, IPEndPoint branchEP, ref User currentUser)
         {
+            Console.WriteLine("Withdraw Operation");
+            Console.WriteLine("-----------------------------");
             Console.Write("Input amount: ");
             double amount = Double.Parse(Console.ReadLine() ?? "");
-            Transaction t = new Transaction(currentUser.UserId, currentUser.UserId, amount, TransactionType.Withdraw);
+            Transaction t = new Transaction(currentUser.UserId, amount, TransactionType.Withdraw);
             byte[] payload = SerializationHelper.Serialize(PackageType.TransactionRequest, t);
 
             try
@@ -146,7 +150,27 @@ namespace Client
         }
         private static void HandleTransfer(Socket clientSocket, IPEndPoint branchEP, ref User currentUser)
         {
-            throw new NotImplementedException();
+            Console.WriteLine("Transfer Operation");
+            Console.WriteLine("-----------------------------");
+            Console.Write("Input amount: ");
+            double amount = Double.Parse(Console.ReadLine() ?? "");
+            Console.Write("Input recipient account number: ");
+            string recipientAccountNumber = Console.ReadLine() ?? "";
+            Transaction t = new Transaction(currentUser.UserId, amount, TransactionType.Transfer,recipientAccountNumber);
+            byte[] payload = SerializationHelper.Serialize(PackageType.TransactionRequest, t);
+
+            try
+            {
+                TransactionResponseDTO dto = (TransactionResponseDTO)SendAndAwaitResponse(clientSocket, branchEP, payload);
+                if (dto.Result)
+                    Console.WriteLine("Trasfer successful.");
+                else
+                    Console.WriteLine("Transfer failed.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Transfer failed: {ex.Message}");
+            }
         }
         private static User UserLogin(Socket clientSocket, IPEndPoint branchEP)
         {

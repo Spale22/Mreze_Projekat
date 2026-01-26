@@ -13,30 +13,31 @@ namespace Infrastructure
                 {
                     FirstName = $"Client{i}",
                     LastName = $"Client{i}",
+                    Username = $"client{i}",
+                    Password = $"password{i}",
+                    AccountNumber = $"{i}",
                     Balance = 1000.0 + i * 100
                 };
-                clientRepository.CreateClient(client);
+                clientRepository.Create(client);
                 for (int k = 0; k < 5; k++)
                 {
                     var transactionW = new Transaction
                     {
-                        SenderId = client.ClientId,
-                        RecipientId = client.ClientId,
+                        SenderId = client.UserId,
                         Amount = -100.0,
                         Timestamp = DateTime.Now,
-                        Type = TransactionType.Withdrawal
+                        Type = TransactionType.Withdraw
                     };
-                    transactionRepository.CreateTransaction(transactionW);
+                    transactionRepository.Create(transactionW);
 
                     var transactionD = new Transaction
                     {
-                        SenderId = client.ClientId,
-                        RecipientId = client.ClientId,
+                        SenderId = client.UserId,
                         Amount = k * 100.0,
                         Timestamp = DateTime.Now,
                         Type = TransactionType.Deposit
                     };
-                    transactionRepository.CreateTransaction(transactionD);
+                    transactionRepository.Create(transactionD);
                 }
             }
         }

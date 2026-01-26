@@ -14,13 +14,13 @@ namespace Infrastructure
         {
             clientRepository = _clientRepository;
         }
-        public bool CreateTransaction(Transaction newTransaction)
+        public bool Create(Transaction newTransaction)
         {
             switch (newTransaction.Type)
             {
                 case TransactionType.Deposit:
 
-                    var client = clientRepository.GetClientById(newTransaction.RecipientId);
+                    var client = clientRepository.GetClientById(newTransaction.SenderId);
 
                     if (client == null)
                         return false;
@@ -49,7 +49,7 @@ namespace Infrastructure
                 case TransactionType.Transfer:
 
                     var senderClient = clientRepository.GetClientById(newTransaction.SenderId);
-                    var recipientClient = clientRepository.GetClientById(newTransaction.RecipientId);
+                    var recipientClient = clientRepository.GetClientByAccountNumber(newTransaction.RecipientAccountNumber);
 
                     if (senderClient == null || recipientClient == null || senderClient.Balance < newTransaction.Amount)
                         return false;

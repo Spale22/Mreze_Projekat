@@ -5,7 +5,7 @@ namespace Domain
 {
     public interface ITransactionRepository
     {
-        bool CreateTransaction(Transaction newTransaction);
+        bool Create(Transaction newTransaction);
         Transaction GetTransactionById(Guid transactionId);
         IEnumerable<Transaction> GetAllTransactions();
     }

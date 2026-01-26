@@ -4,10 +4,8 @@
     {
         Unknown = 0,
         AuthRequest,
-        TransactionRequest,
-        ClientDataRequest,
         AuthResponse,
+        TransactionRequest,
         TransactionResponse,
-        ClientDataResponse
     }
 }

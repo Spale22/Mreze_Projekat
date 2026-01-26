@@ -12,7 +12,6 @@ namespace Server
     {
         static readonly TransactionService transactionService = new TransactionService();
         static readonly AuthenticationService authenticationService = new AuthenticationService();
-        static readonly ClientDataService clientDataService = new ClientDataService();
         const int maxClients = 10;
         static void Main(string[] args)
         {

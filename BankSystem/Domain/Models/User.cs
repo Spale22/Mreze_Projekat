@@ -11,8 +11,9 @@ namespace Domain
         public double Balance { get; set; } = 0.0;
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
+        public string AccountNumber { get; set; } = string.Empty;
         public User() { }
-        public User(string firstName, string lastName, double initialBalance, string username, string password)
+        public User(string username, string password, string firstName, string lastName, double initialBalance, string accountNumber)
         {
             UserId = Guid.NewGuid();
             FirstName = firstName;
@@ -20,6 +21,7 @@ namespace Domain
             Balance = initialBalance;
             Username = username;
             Password = password;
+            AccountNumber = accountNumber;
         }
     }
 }
