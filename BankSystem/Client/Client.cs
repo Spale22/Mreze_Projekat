@@ -16,7 +16,7 @@ namespace Client
             Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             clientSocket.Blocking = false;
 
-            Console.WriteLine("UDP Client started.");
+            Console.WriteLine("Client started.");
             Console.WriteLine("-----------------------------");
             Console.WriteLine("Press Ctrl+C to exit.");
             Console.WriteLine("-----------------------------");

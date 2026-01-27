@@ -161,12 +161,15 @@ namespace Server
             switch (obj)
             {
                 case AuthRequestDTO authDto:
+                    Console.WriteLine($"Received authentication request from {s.RemoteEndPoint.ToString()}");
                     HandleAuthRequest(s, authDto);
                     break;
                 case Transaction transactionDto:
+                    Console.WriteLine($"Received transaction request from {s.RemoteEndPoint.ToString()}");
                     HandleTransactionRequest(s, transactionDto);
                     break;
                 case Guid clientId:
+                    Console.WriteLine($"Received balance inquiry request from {s.RemoteEndPoint.ToString()}");
                     HandleBalanceInquiryRequest(s, clientId);
                     break;
                 case null:
@@ -190,6 +193,7 @@ namespace Server
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
+                Console.WriteLine($"Balance inquiry request proccessed sending response to BranchOffice");
                 s.Send(data);
             }
             catch (Exception ex)
@@ -200,6 +204,7 @@ namespace Server
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
+                Console.WriteLine("Sending error message to BranchOffice");
                 s.Send(data);
             }
         }
@@ -213,6 +218,7 @@ namespace Server
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
+                Console.WriteLine("Authentication request processed, sending response to BranchOffice");
                 s.Send(data);
             }
             catch (Exception ex)
@@ -223,6 +229,7 @@ namespace Server
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
+                Console.WriteLine("Sending error message to BranchOffice");
                 s.Send(data);
             }
         }
@@ -237,6 +244,7 @@ namespace Server
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
+                Console.WriteLine("Transaction request processed, sending response to BranchOffice");
                 s.Send(data);
             }
             catch (Exception ex)
@@ -247,6 +255,7 @@ namespace Server
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
+                Console.WriteLine("Sending error message to BranchOffice");
                 s.Send(data);
             }
         }

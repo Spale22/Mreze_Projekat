@@ -124,6 +124,9 @@ namespace BranchOffice
 
             byte[] data = new byte[bytesReceived];
             Buffer.BlockCopy(buffer, 0, data, 0, bytesReceived);
+
+            Console.WriteLine($"Forwarding request from client {tempEP.ToString()} to server.");
+
             serverSocket.Send(data);
 
             pendingReplies.Enqueue(tempEP);
@@ -169,6 +172,9 @@ namespace BranchOffice
 
                     byte[] frame = new byte[bytesRead];
                     Buffer.BlockCopy(recvBuffer, 0, frame, 0, bytesRead);
+
+                    Console.WriteLine($"Forwarding response from server to client {targetClient.ToString()}.");
+
                     branchSocket.SendTo(frame, targetClient);
                 }
                 catch (SocketException ex)
