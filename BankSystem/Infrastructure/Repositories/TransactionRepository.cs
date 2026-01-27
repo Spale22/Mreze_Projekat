@@ -7,10 +7,10 @@ namespace Infrastructure
 {
     public class TransactionRepository : ITransactionRepository
     {
-        private readonly IClientRepository clientRepository;
+        private readonly IUserRepository clientRepository;
 
         ConcurrentDictionary<Guid, Transaction> transactions = new ConcurrentDictionary<Guid, Transaction>();
-        public TransactionRepository(IClientRepository _clientRepository)
+        public TransactionRepository(IUserRepository _clientRepository)
         {
             clientRepository = _clientRepository;
         }

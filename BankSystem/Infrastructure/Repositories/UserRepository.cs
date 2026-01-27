@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace Infrastructure
 {
-    public class ClientRepository : IClientRepository
+    public class UserRepository : IUserRepository
     {
         ConcurrentDictionary<Guid, User> clients = new ConcurrentDictionary<Guid, User>();
         public bool Create(User newClient)

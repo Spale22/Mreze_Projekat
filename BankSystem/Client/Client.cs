@@ -46,42 +46,32 @@ namespace Client
                         break;
 
                     int opr = -1;
-                    do
+                    while ((opr < 0 || opr > 4) && !cts.IsCancellationRequested)
                     {
                         Console.WriteLine("Operation: ");
                         Console.WriteLine(" 0 - Logout");
-                        Console.WriteLine(" 1 - Balance inquiry");
-                        Console.WriteLine(" 2 - Deposit");
-                        Console.WriteLine(" 3 - Withdraw");
-                        Console.WriteLine(" 4 - Transfer money");
+                        Console.WriteLine(" 1 - Deposit");
+                        Console.WriteLine(" 2 - Withdraw");
+                        Console.WriteLine(" 3 - Transfer money");
+                        Console.WriteLine(" 4 - Balance inquiry");
                         Console.WriteLine("-----------------------------");
                         Console.Write("Select operation (1-4): ");
                         Int32.TryParse(Console.ReadLine(), out opr);
                         Console.WriteLine("-----------------------------");
-                    } while ((opr < 0 || opr > 4) && !cts.IsCancellationRequested);
+                    } 
 
                     if (cts.IsCancellationRequested)
                         break;
 
-                    switch (opr)
+                    if (opr == 0)
                     {
-                        case 0:
-                            Console.WriteLine("Logging out ...");
-                            currentUser = new User();
-                            break;
-                        case 1:
-                            HandleBalanceInquiry(clientSocket, branchEP, ref currentUser);
-                            break;
-                        case 2:
-                            HandleDeposit(clientSocket, branchEP, ref currentUser);
-                            break;
-                        case 3:
-                            HandleWithdraw(clientSocket, branchEP, ref currentUser);
-                            break;
-                        case 4:
-                            HandleTransfer(clientSocket, branchEP, ref currentUser);
-                            break;
+                        Console.WriteLine("Logging out ...");
+                        currentUser = new User();
                     }
+                    else if (opr >= 1 && opr <= 3)
+                        HandleTransaction(clientSocket, branchEP, ref currentUser, (TransactionType)opr);
+                    else
+                        HandleBalanceInquiry(clientSocket, branchEP, ref currentUser);
                 }
             }
             catch (Exception ex)
@@ -91,7 +81,7 @@ namespace Client
             finally
             {
                 clientSocket.Close();
-                Console.WriteLine("Client shuting down ...");
+                Console.WriteLine("Client shutting down ...");
                 Console.ReadKey();
             }
         }
@@ -118,7 +108,7 @@ namespace Client
         {
             byte[] encryptedPayload = Encryptor.Encrypt(enc_key, payload);
             if (encryptedPayload == null || encryptedPayload.Length == 0)
-                throw new Exception("Ecryption failed or resulted in empty data.");
+                throw new Exception("Encryption failed or resulted in empty data.");
 
             clientSocket.SendTo(encryptedPayload, branchEP);
             Object result = null;
@@ -132,11 +122,14 @@ namespace Client
                 int bytesRead = clientSocket.ReceiveFrom(buffer, ref remote);
                 if (bytesRead <= 0)
                     throw new Exception("Received zero bytes from server.");
+
                 byte[] frame = new byte[bytesRead];
                 Buffer.BlockCopy(buffer, 0, frame, 0, bytesRead);
                 byte[] data = Encryptor.Decrypt(enc_key, frame);
+
                 if (data == null || data.Length == 0)
                     throw new Exception("Decryption failed or resulted in empty data.");
+
                 result = SerializationHelper.Deserialize<Object>(data);
                 if (result.GetType() == typeof(string))
                     throw new Exception("Message from server: " + (string)result);
@@ -166,72 +159,45 @@ namespace Client
                 Console.WriteLine($"Balance inquiry failed:\n {ex.Message}");
             }
         }
-        private static void HandleDeposit(Socket clientSocket, IPEndPoint branchEP, ref User currentUser)
+        private static void HandleTransaction(Socket clientSocket, IPEndPoint branchEP, ref User currentUser, TransactionType transactionType)
         {
-            Console.WriteLine("Deposit Operation");
+            Console.WriteLine($"{transactionType.ToString()} Operation");
             Console.WriteLine("-----------------------------");
-            Console.Write("Input amount: ");
-            double amount = Double.Parse(Console.ReadLine() ?? "");
-            Transaction t = new Transaction(currentUser.UserId, amount, DateTime.Now, TransactionType.Deposit);
+
+            double amount = -1;
+            while (amount <= 0)
+            {
+                Console.Write("Input amount: ");
+                amount = Double.Parse(Console.ReadLine() ?? "");
+                if (amount > 0)
+                    break;
+                Console.WriteLine("Amount must be greater than zero. Please try again.");
+            }
+
+            Transaction t;
+
+            if (transactionType == TransactionType.Transfer)
+            {
+                Console.Write("Input recipient account number: ");
+                string recipientAccountNumber = Console.ReadLine() ?? "";
+                t = new Transaction(currentUser.UserId, amount, DateTime.Now, TransactionType.Transfer, recipientAccountNumber);
+            }
+            else
+                t = new Transaction(currentUser.UserId, amount, DateTime.Now, transactionType);
+
             byte[] payload = SerializationHelper.Serialize(t);
 
             try
             {
                 bool result = (bool)SendAndAwaitResponse(clientSocket, branchEP, payload);
                 if (result)
-                    Console.WriteLine("Deposit successful.");
+                    Console.WriteLine($"{transactionType.ToString()}  successful.");
                 else
-                    Console.WriteLine("Deposit failed.");
+                    Console.WriteLine($"{transactionType.ToString()}  failed.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Deposit failed:\n {ex.Message}");
-            }
-        }
-        private static void HandleWithdraw(Socket clientSocket, IPEndPoint branchEP, ref User currentUser)
-        {
-            Console.WriteLine("Withdraw Operation");
-            Console.WriteLine("-----------------------------");
-            Console.Write("Input amount: ");
-            double amount = Double.Parse(Console.ReadLine() ?? "");
-            Transaction t = new Transaction(currentUser.UserId, amount, DateTime.Now, TransactionType.Withdraw);
-            byte[] payload = SerializationHelper.Serialize(t);
-
-            try
-            {
-                bool result = (bool)SendAndAwaitResponse(clientSocket, branchEP, payload);
-                if (result)
-                    Console.WriteLine("Withdraw successful.");
-                else
-                    Console.WriteLine("Withdraw failed.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Withdraw failed:\n {ex.Message}");
-            }
-        }
-        private static void HandleTransfer(Socket clientSocket, IPEndPoint branchEP, ref User currentUser)
-        {
-            Console.WriteLine("Transfer Operation");
-            Console.WriteLine("-----------------------------");
-            Console.Write("Input amount: ");
-            double amount = Double.Parse(Console.ReadLine() ?? "");
-            Console.Write("Input recipient account number: ");
-            string recipientAccountNumber = Console.ReadLine() ?? "";
-            Transaction t = new Transaction(currentUser.UserId, amount, DateTime.Now, TransactionType.Transfer, recipientAccountNumber);
-            byte[] payload = SerializationHelper.Serialize(t);
-
-            try
-            {
-                bool result = (bool)SendAndAwaitResponse(clientSocket, branchEP, payload);
-                if (result)
-                    Console.WriteLine("Trasfer successful.");
-                else
-                    Console.WriteLine("Transfer failed.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Transfer failed:\n {ex.Message}");
+                Console.WriteLine($"{transactionType.ToString()}  failed:\n {ex.Message}");
             }
         }
         private static User UserLogin(Socket clientSocket, IPEndPoint branchEP, ref CancellationTokenSource cts)

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Domain
 {
-    public interface IClientRepository
+    public interface IUserRepository
     {
         bool Create(User newClient);
         bool Delete(Guid clientId);

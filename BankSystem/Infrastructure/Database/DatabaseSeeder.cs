@@ -5,7 +5,7 @@ namespace Infrastructure
 {
     public static class DatabaseSeeder
     {
-        public static void Seed(IClientRepository clientRepository, ITransactionRepository transactionRepository)
+        public static void Seed(IUserRepository clientRepository, ITransactionRepository transactionRepository)
         {
             for (int i = 0; i < 5; i++)
             {

@@ -70,6 +70,7 @@ namespace BranchOffice
                 int bytes = serverSocket.Receive(buffer);
                 if (bytes == 0)
                     throw new Exception("Connection closed by server while receiving encryption key.");
+
                 enc_key = System.Text.Encoding.UTF8.GetString(buffer, 0, bytes);
                 Console.WriteLine("Received enc_key from server");
             }

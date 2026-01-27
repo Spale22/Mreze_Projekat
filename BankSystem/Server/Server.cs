@@ -101,9 +101,11 @@ namespace Server
                         {
                             if (readSockets.Count >= maxClients)
                                 continue;
+
                             Socket clientSocket = listener.Accept();
                             clientSocket.Blocking = false;
                             readSockets.Add(clientSocket);
+
                             Console.WriteLine($"New client connected: {clientSocket.RemoteEndPoint}");
                             clientSocket.Send(Encoding.UTF8.GetBytes(enc_key));
                             continue;
@@ -183,7 +185,7 @@ namespace Server
                 byte[] responseBytes = SerializationHelper.Serialize(balance);
                 byte[] data = Encryptor.Encrypt(enc_key, responseBytes);
                 if (data == null || data.Length == 0)
-                    throw new Exception("Ecryption failed or resulted in empty data.");
+                    throw new Exception("Encryption failed or resulted in empty data.");
 
                 s.Send(data);
             }
@@ -193,7 +195,7 @@ namespace Server
                 byte[] msgBytes = SerializationHelper.Serialize(ex.Message);
                 byte[] data = Encryptor.Encrypt(enc_key, msgBytes);
                 if (data == null || data.Length == 0)
-                    throw new Exception("Ecryption failed or resulted in empty data.");
+                    throw new Exception("Encryption failed or resulted in empty data.");
 
                 s.Send(data);
             }
@@ -206,7 +208,7 @@ namespace Server
                 byte[] responseBytes = SerializationHelper.Serialize(result);
                 byte[] data = Encryptor.Encrypt(enc_key, responseBytes);
                 if (data == null || data.Length == 0)
-                    throw new Exception("Ecryption failed or resulted in empty data.");
+                    throw new Exception("Encryption failed or resulted in empty data.");
 
                 s.Send(data);
             }
@@ -216,7 +218,7 @@ namespace Server
                 byte[] msgBytes = SerializationHelper.Serialize(ex.Message);
                 byte[] data = Encryptor.Encrypt(enc_key, msgBytes);
                 if (data == null || data.Length == 0)
-                    throw new Exception("Ecryption failed or resulted in empty data.");
+                    throw new Exception("Encryption failed or resulted in empty data.");
 
                 s.Send(data);
             }
@@ -230,7 +232,7 @@ namespace Server
                 byte[] responseBytes = SerializationHelper.Serialize(result);
                 byte[] data = Encryptor.Encrypt(enc_key, responseBytes);
                 if (data == null || data.Length == 0)
-                    throw new Exception("Ecryption failed or resulted in empty data.");
+                    throw new Exception("Encryption failed or resulted in empty data.");
 
                 s.Send(data);
             }
@@ -240,7 +242,7 @@ namespace Server
                 byte[] msgBytes = SerializationHelper.Serialize(ex.Message);
                 byte[] data = Encryptor.Encrypt(enc_key, msgBytes);
                 if (data == null || data.Length == 0)
-                    throw new Exception("Ecryption failed or resulted in empty data.");
+                    throw new Exception("Encryption failed or resulted in empty data.");
 
                 s.Send(data);
             }

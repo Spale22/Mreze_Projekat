@@ -13,7 +13,7 @@ namespace Domain
         public string Password { get; set; } = string.Empty;
         public string AccountNumber { get; set; } = string.Empty;
         public User() { }
-        public User(string username, string password, string firstName, string lastName, double initialBalance, string accountNumber)
+        public User(string username, string password, string firstName, string lastName, double initialBalance, string accountNumber = "")
         {
             UserId = Guid.NewGuid();
             FirstName = firstName;
