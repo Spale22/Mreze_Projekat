@@ -11,21 +11,29 @@ namespace Server
 {
     public class Server
     {
-        static readonly IClientRepository clientRepository = new ClientRepository();
-        static readonly ITransactionRepository transactionRepository = new TransactionRepository(clientRepository);
-        static readonly AuthenticationService authenticationService = new AuthenticationService(clientRepository);
-        const int maxClients = 10;
-
+        static readonly IUserRepository userRepository = new UserRepository();
+        static readonly ITransactionRepository transactionRepository = new TransactionRepository(userRepository);
+        static readonly AuthenticationService authenticationService = new AuthenticationService(userRepository);
+        private static readonly List<Socket> clientSockets = new List<Socket>();
+        private const int BUFFER_SIZE = 8192;
+        private const int PORT = 15000;
+        private const int MaxClient = 100;
         private static string enc_key = "";
         static void Main(string[] args)
         {
-            DatabaseSeeder.Seed(clientRepository, transactionRepository);
+            DatabaseSeeder.Seed(userRepository, transactionRepository);
+
 
             Socket listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            IPEndPoint listenEndPoint = new IPEndPoint(IPAddress.Loopback, 15000);
+            IPEndPoint listenEndPoint = new IPEndPoint(IPAddress.Loopback, PORT);
             listenSocket.Blocking = false;
             listenSocket.Bind(listenEndPoint);
-            listenSocket.Listen(maxClients);
+            listenSocket.Listen(MaxClient);
+
+            Console.WriteLine("Server started.");
+            Console.WriteLine("-----------------------------");
+            Console.WriteLine("Press Ctrl+C to exit.");
+            Console.WriteLine("-----------------------------");
 
             try
             {
@@ -34,7 +42,19 @@ namespace Server
                     Console.WriteLine("Input communication encryption key ([A-Z] [0-9] max_length 36):");
                     enc_key = Console.ReadLine();
                 }
-                Multiplexing(listenSocket);
+
+                Console.WriteLine("Key accepted.");
+                Console.WriteLine("Listening for connections...");
+
+                var cts = new CancellationTokenSource();
+                Console.CancelKeyPress += (sender, e) =>
+                {
+                    e.Cancel = true;
+                    cts.Cancel();
+                    Console.WriteLine("Shutdown requested (Ctrl+C).");
+                };
+                while (!cts.IsCancellationRequested)
+                    Multiplexing(listenSocket);
             }
             catch
             (Exception ex)
@@ -43,6 +63,9 @@ namespace Server
             }
             finally
             {
+                foreach (var s in clientSockets)
+                    s.Close();
+
                 listenSocket.Close();
                 Console.WriteLine("Shutting down server...");
                 Console.ReadKey();
@@ -51,87 +74,75 @@ namespace Server
 
         private static void Multiplexing(Socket listener)
         {
-            var cts = new CancellationTokenSource();
-            Console.CancelKeyPress += (sender, e) =>
+            byte[] recvBuffer = new byte[BUFFER_SIZE];
+            List<Socket> checkRead = new List<Socket>() { listener };
+            List<Socket> checkError = new List<Socket>() { listener };
+
+            foreach (Socket s in clientSockets)
             {
-                e.Cancel = true;
-                cts.Cancel();
-                Console.WriteLine("Shutdown requested (Ctrl+C).");
-            };
+                checkRead.Add(s);
+                checkError.Add(s);
+            }
 
-            List<Socket> readSockets = new List<Socket>();
-
-            byte[] recvBuffer = new byte[8192];
             try
             {
-                while (!cts.IsCancellationRequested)
+                Socket.Select(checkRead, null, checkError, 1_000_000);
+
+                if (checkRead.Count == 0 && checkError.Count == 0)
+                    return;
+
+                if (checkError.Count > 0)
                 {
-                    List<Socket> checkRead = new List<Socket>();
-                    List<Socket> checkError = new List<Socket>();
-
-                    if (readSockets.Count < maxClients)
-                        checkRead.Add(listener);
-
-                    checkError.Add(listener);
-
-                    foreach (Socket s in readSockets)
+                    foreach (Socket s in checkError)
                     {
-                        checkRead.Add(s);
-                        checkError.Add(s);
+                        Console.WriteLine($"Socket error on {s.RemoteEndPoint}, closing socket.");
+                        s.Close();
+                        clientSockets.Remove(s);
                     }
+                }
 
-                    Socket.Select(checkRead, null, checkError, 1_000_000);
-
-                    if (checkRead.Count == 0 && checkError.Count == 0)
-                        continue;
-
-                    if (checkError.Count > 0)
+                foreach (Socket s in checkRead)
+                {
+                    if (s == listener)
                     {
-                        foreach (Socket s in checkError)
-                        {
-                            Console.WriteLine($"Socket error on {s.RemoteEndPoint}, closing socket.");
-                            s.Close();
-                            readSockets.Remove(s);
-                        }
-                    }
+                        Socket clientSocket = null;
 
-                    foreach (Socket s in checkRead)
-                    {
-                        if (s == listener)
+                        try
                         {
-                            if (readSockets.Count >= maxClients)
-                                continue;
-
-                            Socket clientSocket = listener.Accept();
+                            clientSocket = listener.Accept();
                             clientSocket.Blocking = false;
-                            readSockets.Add(clientSocket);
+                            clientSockets.Add(clientSocket);
 
                             Console.WriteLine($"New client connected: {clientSocket.RemoteEndPoint}");
                             clientSocket.Send(Encoding.UTF8.GetBytes(enc_key));
-                            continue;
                         }
-
-                        int bytesRead = s.Receive(recvBuffer);
-
-                        if (bytesRead == 0)
+                        catch (SocketException ex)
                         {
-                            Console.WriteLine($"Client disconnected: {s.RemoteEndPoint}");
-                            s.Close();
-                            checkRead.Remove(s);
-                            continue;
+                            Console.WriteLine($"Accept failed: {ex.SocketErrorCode}");
+                            if (clientSocket != null)
+                                clientSocket.Close();
                         }
-                        byte[] frame = new byte[bytesRead];
-                        Buffer.BlockCopy(recvBuffer, 0, frame, 0, bytesRead);
-
-                        byte[] data = Encryptor.Decrypt(enc_key, frame);
-                        if (data == null || data.Length == 0)
-                            throw new Exception("Decryption failed or resulted in empty data.");
-
-                        HandleRequest(s, data, bytesRead);
+                        continue;
                     }
 
-                    checkRead.Clear();
-                    checkError.Clear();
+                    int bytesRead = s.Receive(recvBuffer);
+
+                    if (bytesRead == 0)
+                    {
+                        Console.WriteLine($"Client disconnected: {s.RemoteEndPoint}");
+                        s.Close();
+                        clientSockets.Remove(s);
+                        continue;
+                    }
+
+                    byte[] frame = new byte[bytesRead];
+                    Buffer.BlockCopy(recvBuffer, 0, frame, 0, bytesRead);
+
+                    byte[] data = Encryptor.Decrypt(enc_key, frame);
+                    if (data == null || data.Length == 0)
+                        throw new Exception("Decryption failed or resulted in empty data.");
+
+                    HandleRequest(s, data, bytesRead);
                 }
             }
             catch (SocketException ex)
@@ -142,14 +153,6 @@ namespace Server
             {
                 Console.WriteLine($"Error: {ex.Message}");
             }
-            finally
-            {
-                foreach (var s in readSockets)
-                {
-                    s.Close();
-                }
-            }
-
         }
 
         private static void HandleRequest(Socket s, byte[] buffer, int bytesRead)
@@ -181,7 +184,7 @@ namespace Server
         {
             try
             {
-                double balance = clientRepository.GetClientBalance(clientId);
+                double balance = userRepository.GetClientBalance(clientId);
                 byte[] responseBytes = SerializationHelper.Serialize(balance);
                 byte[] data = Encryptor.Encrypt(enc_key, responseBytes);
                 if (data == null || data.Length == 0)

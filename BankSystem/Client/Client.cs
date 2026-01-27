@@ -9,13 +9,30 @@ namespace Client
 {
     public class Client
     {
+        private const int BUFFER_SIZE = 8192;
         private static string enc_key = "";
         static void Main(string[] args)
         {
             Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             clientSocket.Blocking = false;
 
-            IPEndPoint branchEP = new IPEndPoint(IPAddress.Loopback, 16001);
+            Console.WriteLine("UDP Client started.");
+            Console.WriteLine("-----------------------------");
+            Console.WriteLine("Press Ctrl+C to exit.");
+            Console.WriteLine("-----------------------------");
+
+            int port = -1;
+            while (port < 0 || port > 65535)
+            {
+                Console.Write("Input Branch UDP socket port (0-65535):");
+                string portInput = Console.ReadLine();
+                Int32.TryParse(portInput, out port);
+                if (port > 0 && port < 65535)
+                    break;
+                Console.WriteLine("Invalid port. Please enter a number between 0 and 65535.");
+            }
+
+            IPEndPoint branchEP = new IPEndPoint(IPAddress.Loopback, port);
 
             var cts = new CancellationTokenSource();
 
@@ -28,14 +45,11 @@ namespace Client
 
             try
             {
-                Console.WriteLine("UDP Client started.");
-                Console.WriteLine("-----------------------------");
-                Console.WriteLine("Press Ctrl+C to exit.");
-                Console.WriteLine("-----------------------------");
-
                 User currentUser = new User();
 
+                Console.WriteLine("-----------------------------");
                 GetEncKey(clientSocket, branchEP);
+                Console.WriteLine("-----------------------------");
 
                 while (!cts.IsCancellationRequested)
                 {
@@ -58,7 +72,7 @@ namespace Client
                         Console.Write("Select operation (1-4): ");
                         Int32.TryParse(Console.ReadLine(), out opr);
                         Console.WriteLine("-----------------------------");
-                    } 
+                    }
 
                     if (cts.IsCancellationRequested)
                         break;
@@ -114,7 +128,7 @@ namespace Client
             Object result = null;
 
             int timeoutMicros = 2_000_000;
-            byte[] buffer = new byte[8192];
+            byte[] buffer = new byte[BUFFER_SIZE];
             EndPoint remote = new IPEndPoint(IPAddress.Any, 0);
 
             if (clientSocket.Poll(timeoutMicros, SelectMode.SelectRead))
@@ -150,13 +164,16 @@ namespace Client
                 if (balance < 0)
                 {
                     Console.WriteLine("Balance inquiry failed.");
+                    Console.WriteLine("-----------------------------");
                     return;
                 }
                 Console.WriteLine($"Current balance: {balance}");
+                Console.WriteLine("-----------------------------");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Balance inquiry failed:\n {ex.Message}");
+                Console.WriteLine("-----------------------------");
             }
         }
         private static void HandleTransaction(Socket clientSocket, IPEndPoint branchEP, ref User currentUser, TransactionType transactionType)
@@ -184,7 +201,9 @@ namespace Client
             }
             else
                 t = new Transaction(currentUser.UserId, amount, DateTime.Now, transactionType);
-
+            
+            Console.WriteLine("-----------------------------");
+           
             byte[] payload = SerializationHelper.Serialize(t);
 
             try
@@ -199,6 +218,7 @@ namespace Client
             {
                 Console.WriteLine($"{transactionType.ToString()}  failed:\n {ex.Message}");
             }
+            Console.WriteLine("-----------------------------");
         }
         private static User UserLogin(Socket clientSocket, IPEndPoint branchEP, ref CancellationTokenSource cts)
         {
