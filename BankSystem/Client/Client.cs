@@ -3,6 +3,7 @@ using Infrastructure;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace Client
@@ -15,6 +16,7 @@ namespace Client
         {
             Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             clientSocket.Blocking = false;
+            IPEndPoint branchEP = null;
 
             Console.WriteLine("Client started.");
             Console.WriteLine("-----------------------------");
@@ -22,19 +24,43 @@ namespace Client
             Console.WriteLine("-----------------------------");
 
             int port = -1;
-            while (port < 0 || port > 65535)
+            while (port < 16000 || port > 16100)
             {
-                Console.Write("Input Branch UDP socket port (0-65535):");
+                Console.Write("Input Branch UDP socket port (16000-16100):");
                 string portInput = Console.ReadLine();
-                Int32.TryParse(portInput, out port);
-                if (port > 0 && port < 65535)
+
+                if (!Int32.TryParse(portInput, out port) || port < 16000 || port > 16100)
+                {
+                    Console.WriteLine("Invalid port. Please enter a number between 16000 and 16100.");
+                    continue;
+                }
+
+                branchEP = new IPEndPoint(IPAddress.Loopback, port);
+
+                try
+                {
+                    Console.WriteLine("-----------------------------");
+                    GetEncKey(clientSocket, branchEP);
+                    Console.WriteLine("-----------------------------");
+
                     break;
-                Console.WriteLine("Invalid port. Please enter a number between 0 and 65535.");
+                }
+                catch (SocketException se)
+                {
+                    Console.WriteLine($"Failed to connect with BranchOffic:\n{se.Message}");
+                    Console.WriteLine("Try changing the port");
+                    Console.WriteLine("-----------------------------");
+                    port = -1;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to connect with BranchOffic:\n{ex.Message}");
+                    Console.WriteLine("-----------------------------");
+                    port = -1;
+                }
             }
 
-            IPEndPoint branchEP = new IPEndPoint(IPAddress.Loopback, port);
-
-            var cts = new CancellationTokenSource();
+            CancellationTokenSource cts = new CancellationTokenSource();
 
             Console.CancelKeyPress += (sender, e) =>
             {
@@ -47,10 +73,6 @@ namespace Client
             {
                 User currentUser = new User();
 
-                Console.WriteLine("-----------------------------");
-                GetEncKey(clientSocket, branchEP);
-                Console.WriteLine("-----------------------------");
-
                 while (!cts.IsCancellationRequested)
                 {
                     while (currentUser.UserId == Guid.Empty && !cts.IsCancellationRequested)
@@ -60,7 +82,7 @@ namespace Client
                         break;
 
                     int opr = -1;
-                    while ((opr < 0 || opr > 4) && !cts.IsCancellationRequested)
+                    while (!cts.IsCancellationRequested)
                     {
                         Console.WriteLine("Operation: ");
                         Console.WriteLine(" 0 - Logout");
@@ -69,9 +91,19 @@ namespace Client
                         Console.WriteLine(" 3 - Transfer money");
                         Console.WriteLine(" 4 - Balance inquiry");
                         Console.WriteLine("-----------------------------");
-                        Console.Write("Select operation (1-4): ");
-                        Int32.TryParse(Console.ReadLine(), out opr);
+                        Console.Write("Select operation (0-4): ");
+
+                        string choice = Console.ReadLine();
+
+                        if (string.IsNullOrEmpty(choice) || !Regex.IsMatch(choice, @"^[0-4]$") || !int.TryParse(choice, out opr))
+                        {
+                            Console.WriteLine("Invalid operation. Please select a valid option.");
+                            Console.WriteLine("-----------------------------");
+                            continue;
+                        }
+
                         Console.WriteLine("-----------------------------");
+                        break;
                     }
 
                     if (cts.IsCancellationRequested)
@@ -90,7 +122,7 @@ namespace Client
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred:\n {ex.Message}");
+                Console.WriteLine($"An error occurred:\n{ex.Message}");
             }
             finally
             {
@@ -106,12 +138,16 @@ namespace Client
             byte[] key_buffer = new byte[37];
             EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
             int timeoutMicros = 60_000_000;
+
             if (clientSocket.Poll(timeoutMicros, SelectMode.SelectRead))
             {
                 int recievedBytes = clientSocket.ReceiveFrom(key_buffer, ref remoteEP);
+
                 if (recievedBytes == 0)
                     throw new Exception("Failed to receive encryption key from server.");
+
                 enc_key = System.Text.Encoding.UTF8.GetString(key_buffer, 0, recievedBytes);
+
                 Console.WriteLine("Received encryption key from branch office");
             }
             else
@@ -125,6 +161,7 @@ namespace Client
                 throw new Exception("Encryption failed or resulted in empty data.");
 
             clientSocket.SendTo(encryptedPayload, branchEP);
+
             Object result = null;
 
             int timeoutMicros = 2_000_000;
@@ -139,12 +176,12 @@ namespace Client
 
                 byte[] frame = new byte[bytesRead];
                 Buffer.BlockCopy(buffer, 0, frame, 0, bytesRead);
-                byte[] data = Encryptor.Decrypt(enc_key, frame);
 
+                byte[] data = Encryptor.Decrypt(enc_key, frame);
                 if (data == null || data.Length == 0)
                     throw new Exception("Decryption failed or resulted in empty data.");
 
-                result = SerializationHelper.Deserialize<Object>(data);
+                result = SerializationHelper.Deserialize(data);
                 if (result.GetType() == typeof(string))
                     throw new Exception("Message from server: " + (string)result);
             }
@@ -157,66 +194,103 @@ namespace Client
         {
             Console.WriteLine("Balance Inquiry Operation");
             Console.WriteLine("-----------------------------");
+
             byte[] payload = SerializationHelper.Serialize(currentUser.UserId);
+
             try
             {
-                double balance = (double)SendAndAwaitResponse(clientSocket, branchEP, payload);
+                Object response = SendAndAwaitResponse(clientSocket, branchEP, payload);
+
+                if (response == null || response.GetType() != typeof(Double))
+                    throw new Exception("Invalid response from server.");
+
+                double balance = (double)response;
+
                 if (balance < 0)
                 {
                     Console.WriteLine("Balance inquiry failed.");
                     Console.WriteLine("-----------------------------");
                     return;
                 }
+
                 Console.WriteLine($"Current balance: {balance}");
                 Console.WriteLine("-----------------------------");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Balance inquiry failed:\n {ex.Message}");
+                Console.WriteLine($"Balance inquiry failed:\n{ex.Message}");
                 Console.WriteLine("-----------------------------");
             }
         }
         private static void HandleTransaction(Socket clientSocket, IPEndPoint branchEP, ref User currentUser, TransactionType transactionType)
         {
-            Console.WriteLine($"{transactionType.ToString()} Operation");
-            Console.WriteLine("-----------------------------");
-
-            double amount = -1;
-            while (amount <= 0)
-            {
-                Console.Write("Input amount: ");
-                amount = Double.Parse(Console.ReadLine() ?? "");
-                if (amount > 0)
-                    break;
-                Console.WriteLine("Amount must be greater than zero. Please try again.");
-            }
-
-            Transaction t;
-
-            if (transactionType == TransactionType.Transfer)
-            {
-                Console.Write("Input recipient account number: ");
-                string recipientAccountNumber = Console.ReadLine() ?? "";
-                t = new Transaction(currentUser.UserId, amount, DateTime.Now, TransactionType.Transfer, recipientAccountNumber);
-            }
-            else
-                t = new Transaction(currentUser.UserId, amount, DateTime.Now, transactionType);
-            
-            Console.WriteLine("-----------------------------");
-           
-            byte[] payload = SerializationHelper.Serialize(t);
-
             try
             {
-                bool result = (bool)SendAndAwaitResponse(clientSocket, branchEP, payload);
+                Console.WriteLine($"{transactionType.ToString()} Operation");
+                Console.WriteLine("-----------------------------");
+
+                double amount = -1;
+                while (amount <= 0)
+                {
+                    Console.Write("Input amount: ");
+                    if (!double.TryParse(Console.ReadLine(), out amount))
+                    {
+                        Console.WriteLine("Invalid amount. Please enter a valid number.");
+                        continue;
+                    }
+
+                    if (amount > 0)
+                        break;
+
+                    Console.WriteLine("Amount must be greater than zero. Please try again.");
+                }
+
+                Transaction t;
+
+                if (transactionType == TransactionType.Transfer)
+                {
+                    byte[] balanceBuffer = SerializationHelper.Serialize(currentUser.UserId);
+
+                    Object response = SendAndAwaitResponse(clientSocket, branchEP, balanceBuffer);
+
+                    if (response == null || response.GetType() != typeof(Double))
+                        throw new Exception("Invalid response from server.");
+
+                    double balance = (double)response;
+                    if (balance < amount)
+                    {
+                        Console.WriteLine("Transfer failed:\nInsufficient funds.");
+                        Console.WriteLine("-----------------------------");
+                        return;
+                    }
+
+                    Console.Write("Input recipient account number: ");
+                    string recipientAccountNumber = Console.ReadLine() ?? "";
+
+                    t = new Transaction(currentUser.UserId, amount, DateTime.Now, TransactionType.Transfer, recipientAccountNumber);
+                }
+                else
+                    t = new Transaction(currentUser.UserId, amount, DateTime.Now, transactionType);
+
+                Console.WriteLine("-----------------------------");
+
+                byte[] payload = SerializationHelper.Serialize(t);
+
+                Object _response = SendAndAwaitResponse(clientSocket, branchEP, payload);
+
+                if (_response == null || _response.GetType() != typeof(Boolean))
+                    throw new Exception("Invalid response from server.");
+
+                bool result = (bool)_response;
+
                 if (result)
                     Console.WriteLine($"{transactionType.ToString()}  successful.");
                 else
-                    Console.WriteLine($"{transactionType.ToString()}  failed.");
+                    Console.WriteLine($"{transactionType.ToString()}  failed.\nInvalid recipient account number!");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"{transactionType.ToString()}  failed:\n {ex.Message}");
+                Console.WriteLine($"{transactionType.ToString()}  failed:\n{ex.Message}");
             }
             Console.WriteLine("-----------------------------");
         }
@@ -224,6 +298,7 @@ namespace Client
         {
             Console.WriteLine("User Login");
             Console.WriteLine("-----------------------------");
+
             Console.Write("Enter username: ");
             string username = Console.ReadLine();
 
@@ -241,10 +316,17 @@ namespace Client
                 Username = username,
                 Password = password
             };
+
             byte[] payload = SerializationHelper.Serialize(authRequest);
+
             try
             {
-                User dto = (User)SendAndAwaitResponse(clientSocket, branchEP, payload);
+                Object response = SendAndAwaitResponse(clientSocket, branchEP, payload);
+
+                if (response == null || response.GetType() != typeof(User))
+                    throw new Exception("Invalid response from server.");
+
+                User dto = (User)response;
 
                 Console.WriteLine("-----------------------------");
                 Console.WriteLine($"Welcome, {dto.FirstName} {dto.LastName}!");
@@ -253,7 +335,8 @@ namespace Client
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Login failed:\n {ex.Message}");
+                Console.WriteLine($"Login failed:\n{ex.Message}");
+                Console.WriteLine("-----------------------------");
                 return new User();
             }
         }

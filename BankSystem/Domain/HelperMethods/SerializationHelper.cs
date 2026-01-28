@@ -1,28 +1,43 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 
 namespace Domain
 {
     public static class SerializationHelper
     {
-        public static byte[] Serialize<T>(T obj)
+        public static byte[] Serialize(object obj)
         {
-            byte[] dataBuffer;
-            using (MemoryStream ms = new MemoryStream())
+            try
             {
-                BinaryFormatter bf = new BinaryFormatter();
-                bf.Serialize(ms, obj);
-                dataBuffer = ms.ToArray();
-                return dataBuffer;
+                byte[] dataBuffer;
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    BinaryFormatter bf = new BinaryFormatter();
+                    bf.Serialize(ms, obj);
+                    dataBuffer = ms.ToArray();
+                    return dataBuffer;
+                }
+            }
+            catch
+            {
+                throw new Exception("Serialization failed");
             }
         }
-        public static T Deserialize<T>(byte[] data)
+        public static object Deserialize(byte[] data)
         {
-            using (Stream ms = new MemoryStream(data))
+            try
             {
-                BinaryFormatter bf = new BinaryFormatter();
-                object obj = bf.Deserialize(ms);
-                return (T)obj;
+                using (MemoryStream ms = new MemoryStream(data))
+                {
+                    BinaryFormatter bf = new BinaryFormatter();
+                    object obj = bf.Deserialize(ms);
+                    return obj;
+                }
+            }
+            catch
+            {
+                throw new Exception("Serialization failed");
             }
         }
     }

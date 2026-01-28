@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace Server
@@ -37,27 +38,36 @@ namespace Server
 
             try
             {
-                while (string.IsNullOrWhiteSpace(enc_key) || enc_key.Length > 36)
+                bool valid_key = false;
+                while (true)
                 {
-                    Console.WriteLine("Input communication encryption key ([A-Z] [0-9] max_length 36):");
+                    Console.WriteLine("Input communication encryption key ([A-Z] [a-z] [0-9] max_length 36):");
                     enc_key = Console.ReadLine();
+
+                    valid_key = Regex.IsMatch(enc_key, @"^[A-Za-z0-9]{1,36}$");
+
+                    if (valid_key)
+                        break;
+
+                    Console.WriteLine("Invalid key. Please try again.");
                 }
 
                 Console.WriteLine("Key accepted.");
                 Console.WriteLine("Listening for connections...");
 
-                var cts = new CancellationTokenSource();
+                CancellationTokenSource cts = new CancellationTokenSource();
+
                 Console.CancelKeyPress += (sender, e) =>
                 {
                     e.Cancel = true;
                     cts.Cancel();
                     Console.WriteLine("Shutdown requested (Ctrl+C).");
                 };
+
                 while (!cts.IsCancellationRequested)
                     Multiplexing(listenSocket);
             }
-            catch
-            (Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine($"Server error: {ex.Message}");
             }
@@ -157,32 +167,41 @@ namespace Server
 
         private static void HandleRequest(Socket s, byte[] buffer, int bytesRead)
         {
-            Object obj = SerializationHelper.Deserialize<object>(buffer);
-            switch (obj)
+            try
             {
-                case AuthRequestDTO authDto:
-                    Console.WriteLine($"Received authentication request from {s.RemoteEndPoint.ToString()}");
-                    HandleAuthRequest(s, authDto);
-                    break;
-                case Transaction transactionDto:
-                    Console.WriteLine($"Received transaction request from {s.RemoteEndPoint.ToString()}");
-                    HandleTransactionRequest(s, transactionDto);
-                    break;
-                case Guid clientId:
-                    Console.WriteLine($"Received balance inquiry request from {s.RemoteEndPoint.ToString()}");
-                    HandleBalanceInquiryRequest(s, clientId);
-                    break;
-                case null:
-                    Console.WriteLine("Received null package payload.");
-                    break;
-                default:
-                    IPEndPoint senderEP = s.RemoteEndPoint as IPEndPoint;
-                    string addr = senderEP != null ? $"{senderEP.Address}:{senderEP.Port}" : "unknown endpoint";
-                    Console.WriteLine($"Unknown package type received ({obj.GetType().FullName}), from {addr}");
-                    break;
+                Object result = SerializationHelper.Deserialize(buffer);
+
+                switch (result)
+                {
+                    case AuthRequestDTO authDto:
+                        Console.WriteLine($"Received authentication request from {s.RemoteEndPoint.ToString()}");
+                        HandleAuthRequest(s, authDto);
+                        break;
+
+                    case Transaction transactionDto:
+                        Console.WriteLine($"Received transaction request from {s.RemoteEndPoint.ToString()}");
+                        HandleTransactionRequest(s, transactionDto);
+                        break;
+
+                    case Guid clientId:
+                        Console.WriteLine($"Received balance inquiry request from {s.RemoteEndPoint.ToString()}");
+                        HandleBalanceInquiryRequest(s, clientId);
+                        break;
+
+                    case null:
+                        Console.WriteLine("Received null package payload.");
+                        break;
+
+                    default:
+                        Console.WriteLine($"Unknown package type received ({result.GetType().FullName}), from {s.RemoteEndPoint.ToString()}");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
             }
         }
-
         private static void HandleBalanceInquiryRequest(Socket s, Guid clientId)
         {
             try
@@ -190,21 +209,26 @@ namespace Server
                 double balance = userRepository.GetClientBalance(clientId);
                 byte[] responseBytes = SerializationHelper.Serialize(balance);
                 byte[] data = Encryptor.Encrypt(enc_key, responseBytes);
+
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
                 Console.WriteLine($"Balance inquiry request proccessed sending response to BranchOffice");
+
                 s.Send(data);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Balance inquiry error: {ex.Message}");
+
                 byte[] msgBytes = SerializationHelper.Serialize(ex.Message);
                 byte[] data = Encryptor.Encrypt(enc_key, msgBytes);
+
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
                 Console.WriteLine("Sending error message to BranchOffice");
+
                 s.Send(data);
             }
         }
@@ -215,10 +239,12 @@ namespace Server
                 User result = authenticationService.Authenticate(dto);
                 byte[] responseBytes = SerializationHelper.Serialize(result);
                 byte[] data = Encryptor.Encrypt(enc_key, responseBytes);
+
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
                 Console.WriteLine("Authentication request processed, sending response to BranchOffice");
+
                 s.Send(data);
             }
             catch (Exception ex)
@@ -226,10 +252,12 @@ namespace Server
                 Console.WriteLine($"Authentication error: {ex.Message}");
                 byte[] msgBytes = SerializationHelper.Serialize(ex.Message);
                 byte[] data = Encryptor.Encrypt(enc_key, msgBytes);
+
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
                 Console.WriteLine("Sending error message to BranchOffice");
+
                 s.Send(data);
             }
         }
@@ -241,10 +269,12 @@ namespace Server
                 bool result = transactionRepository.Create(dto);
                 byte[] responseBytes = SerializationHelper.Serialize(result);
                 byte[] data = Encryptor.Encrypt(enc_key, responseBytes);
+
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
                 Console.WriteLine("Transaction request processed, sending response to BranchOffice");
+
                 s.Send(data);
             }
             catch (Exception ex)
@@ -252,10 +282,12 @@ namespace Server
                 Console.WriteLine($"Transaction processing error: {ex.Message}");
                 byte[] msgBytes = SerializationHelper.Serialize(ex.Message);
                 byte[] data = Encryptor.Encrypt(enc_key, msgBytes);
+
                 if (data == null || data.Length == 0)
                     throw new Exception("Encryption failed or resulted in empty data.");
 
                 Console.WriteLine("Sending error message to BranchOffice");
+
                 s.Send(data);
             }
         }
