@@ -47,14 +47,14 @@ namespace Client
                 }
                 catch (SocketException se)
                 {
-                    Console.WriteLine($"Failed to connect with BranchOffic:\n{se.Message}");
+                    Console.WriteLine($"Failed to connect with BranchOfficе:\n{se.Message}");
                     Console.WriteLine("Try changing the port");
                     Console.WriteLine("-----------------------------");
                     port = -1;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Failed to connect with BranchOffic:\n{ex.Message}");
+                    Console.WriteLine($"Failed to connect with BranchOffice:\n{ex.Message}");
                     Console.WriteLine("-----------------------------");
                     port = -1;
                 }

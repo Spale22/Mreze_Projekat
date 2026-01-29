@@ -135,9 +135,15 @@ namespace Server
                         continue;
                     }
 
-                    int bytesRead = s.Receive(recvBuffer);
+                    int bytesRead = 0;
 
-                    if (bytesRead == 0)
+                    try
+                    {
+                        bytesRead = s.Receive(recvBuffer);
+                        if (bytesRead == 0) 
+                            throw new SocketException();
+                    }
+                    catch (SocketException ex)
                     {
                         Console.WriteLine($"Client disconnected: {s.RemoteEndPoint}");
                         s.Close();
