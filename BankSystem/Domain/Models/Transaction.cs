@@ -1,7 +1,25 @@
-﻿namespace Domain.Models
+﻿using System;
+
+namespace Domain
 {
+    [Serializable]
     public class Transaction
     {
-        // TO DO: Implement transaction model properties and methods here
+        public Guid TransactionId { get; private set; } = Guid.Empty;
+        public Guid SenderId { get; set; } = Guid.Empty;
+        public string RecipientAccountNumber { get; set; } = string.Empty;
+        public double Amount { get; set; } = 0.0;
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+        public TransactionType Type { get; set; } = TransactionType.Unknown;
+        public Transaction() { }
+        public Transaction(Guid senderClientId, double amount, DateTime timestamp, TransactionType type, string accountNumber = "")
+        {
+            TransactionId = Guid.NewGuid();
+            SenderId = senderClientId;
+            Timestamp = timestamp;
+            RecipientAccountNumber = accountNumber;
+            Amount = amount;
+            Type = type;
+        }
     }
 }
